@@ -261,7 +261,13 @@ function DraggableGridCanvas({
   const [penStrokes, setPenStrokes] = useState([])
   const [shapeConnections, setShapeConnections] = useState([])
   const [connectionSourceShapeId, setConnectionSourceShapeId] = useState(null)
-  const [toolbarScreenPosition, setToolbarScreenPosition] = useState({ selectionKey: '', left: 0, top: 0 })
+  const [toolbarScreenPosition, setToolbarScreenPosition] = useState({
+    selectionKey: '',
+    left: 0,
+    top: 0,
+    anchorWorldX: 0,
+    anchorWorldY: 0,
+  })
 
   const isPenTool = activeTool === 'pen'
 
@@ -287,6 +293,7 @@ function DraggableGridCanvas({
     isPanning,
     selectedShapeIds,
     selectionRectWorld,
+    showSelectionToolbar,
     clearSelection,
     handlePointerDown,
     handlePointerMove,
@@ -679,21 +686,30 @@ function DraggableGridCanvas({
     ? getRulerMarks({ trackLength: viewportSize.height, offsetPx: viewport.y, zoom: viewport.zoom })
     : []
   const alignmentGuideLines = showAlignmentGuides ? getAlignmentGuideLines(selectedBoundsWorld, viewport) : []
+  const toolbarAnchorWorld = selectedBoundsWorld
+    ? {
+      x: (selectedBoundsWorld.x1 + selectedBoundsWorld.x2) / 2,
+      y: selectedBoundsWorld.y1,
+    }
+    : null
 
   const getToolbarPosition = () => {
-    if (!selectedBoundsWorld) {
+    if (!showSelectionToolbar || !selectedBoundsWorld || !toolbarAnchorWorld) {
       return null
     }
 
-    const selectedCenterX = (selectedBoundsWorld.x1 + selectedBoundsWorld.x2) / 2
-    const selectedTop = selectedBoundsWorld.y1
-
-    const centerScreen = worldToScreenPoint({ x: selectedCenterX, y: selectedTop }, viewport)
+    const centerScreen = worldToScreenPoint(toolbarAnchorWorld, viewport)
     const anchorLeft = centerScreen.x
     const anchorTop = centerScreen.y - 12
     const hasPinnedScreenPosition = toolbarScreenPosition.selectionKey === selectionKey
-    const rawLeft = hasPinnedScreenPosition ? toolbarScreenPosition.left : anchorLeft
-    const rawTop = hasPinnedScreenPosition ? toolbarScreenPosition.top : anchorTop
+    const anchorScreenDeltaX = hasPinnedScreenPosition
+      ? (toolbarAnchorWorld.x - toolbarScreenPosition.anchorWorldX) * viewport.zoom
+      : 0
+    const anchorScreenDeltaY = hasPinnedScreenPosition
+      ? (toolbarAnchorWorld.y - toolbarScreenPosition.anchorWorldY) * viewport.zoom
+      : 0
+    const rawLeft = hasPinnedScreenPosition ? toolbarScreenPosition.left + anchorScreenDeltaX : anchorLeft
+    const rawTop = hasPinnedScreenPosition ? toolbarScreenPosition.top + anchorScreenDeltaY : anchorTop
 
     return {
       left: clamp(rawLeft, 12, Math.max(12, viewportSize.width - 12)),
@@ -732,10 +748,16 @@ function DraggableGridCanvas({
             canConnectSelected={canToggleConnectionMode}
             isConnectMode={isConnecting}
             onToolbarOffsetDelta={({ deltaX, deltaY }) => {
+              if (!toolbarAnchorWorld) {
+                return
+              }
+
               setToolbarScreenPosition((previous) => ({
                 selectionKey,
                 left: (previous.selectionKey === selectionKey ? previous.left : toolbarPosition.left) + deltaX,
                 top: (previous.selectionKey === selectionKey ? previous.top : toolbarPosition.top) + deltaY,
+                anchorWorldX: previous.selectionKey === selectionKey ? previous.anchorWorldX : toolbarAnchorWorld.x,
+                anchorWorldY: previous.selectionKey === selectionKey ? previous.anchorWorldY : toolbarAnchorWorld.y,
               }))
             }}
             onApplyPreset={(preset) => {

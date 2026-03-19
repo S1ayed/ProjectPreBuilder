@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { getResizedShapePatch } from './shapeResize'
 
+const SHAPE_DRAG_THRESHOLD_PX = 3
+
 const normalizeRect = (rect) => ({
   x1: Math.min(rect.x1, rect.x2),
   y1: Math.min(rect.y1, rect.y2),
@@ -41,10 +43,12 @@ export function useCanvasMouseActions({
   const [isPanning, setIsPanning] = useState(false)
   const [selectedShapeIds, setSelectedShapeIds] = useState([])
   const [selectionRectWorld, setSelectionRectWorld] = useState(null)
+  const [showSelectionToolbar, setShowSelectionToolbar] = useState(false)
 
   const clearSelection = useCallback(() => {
     setSelectedShapeIds([])
     setSelectionRectWorld(null)
+    setShowSelectionToolbar(false)
   }, [])
 
   const startCapturedInteraction = (event, interactionState) => {
@@ -98,6 +102,7 @@ export function useCanvasMouseActions({
         setSelectedShapeIds((previousIds) => (
           previousIds.includes(hitShape.id) ? previousIds : [...previousIds, hitShape.id]
         ))
+        setShowSelectionToolbar(true)
         return
       }
 
@@ -112,12 +117,14 @@ export function useCanvasMouseActions({
       })
 
       setSelectedShapeIds(movingShapeIds)
+      setShowSelectionToolbar(false)
       startCapturedInteraction(event, {
         mode: 'move-shapes',
         startClientX: event.clientX,
         startClientY: event.clientY,
         zoomAtStart: viewport.zoom,
         initialPositions,
+        hasMoved: false,
       })
       return
     }
@@ -133,6 +140,7 @@ export function useCanvasMouseActions({
 
     if (!appendSelection) {
       setSelectedShapeIds([])
+      setShowSelectionToolbar(false)
     }
 
     setSelectionRectWorld({ x1: startWorld.x, y1: startWorld.y, x2: startWorld.x, y2: startWorld.y })
@@ -186,6 +194,21 @@ export function useCanvasMouseActions({
     }
 
     if (interaction.mode === 'move-shapes') {
+      const movedX = Math.abs(event.clientX - interaction.startClientX)
+      const movedY = Math.abs(event.clientY - interaction.startClientY)
+      const didReachMoveThreshold = movedX >= SHAPE_DRAG_THRESHOLD_PX || movedY >= SHAPE_DRAG_THRESHOLD_PX
+
+      if (!interaction.hasMoved && !didReachMoveThreshold) {
+        return
+      }
+
+      if (!interaction.hasMoved && didReachMoveThreshold) {
+        interactionRef.current = {
+          ...interaction,
+          hasMoved: true,
+        }
+      }
+
       const deltaWorldX = (event.clientX - interaction.startClientX) / interaction.zoomAtStart
       const deltaWorldY = (event.clientY - interaction.startClientY) / interaction.zoomAtStart
 
@@ -225,11 +248,22 @@ export function useCanvasMouseActions({
   }
 
   const handlePointerUp = (event) => {
+    if (interactionRef.current.mode === 'move-shapes') {
+      const movedX = Math.abs(event.clientX - interactionRef.current.startClientX)
+      const movedY = Math.abs(event.clientY - interactionRef.current.startClientY)
+      const didMoveShape = interactionRef.current.hasMoved
+        || movedX >= SHAPE_DRAG_THRESHOLD_PX
+        || movedY >= SHAPE_DRAG_THRESHOLD_PX
+
+      setShowSelectionToolbar(!didMoveShape)
+    }
+
     if (interactionRef.current.mode === 'marquee') {
       const movedX = Math.abs(event.clientX - interactionRef.current.startClientX)
       const movedY = Math.abs(event.clientY - interactionRef.current.startClientY)
       if (movedX < 3 && movedY < 3 && !interactionRef.current.appendSelection) {
         setSelectedShapeIds([])
+        setShowSelectionToolbar(false)
       }
     }
 
@@ -266,6 +300,7 @@ export function useCanvasMouseActions({
     isPanning,
     selectedShapeIds,
     selectionRectWorld,
+    showSelectionToolbar,
     clearSelection,
     handlePointerDown,
     handlePointerMove,

@@ -21,7 +21,7 @@ function CanvasTopBar({ zoom, onZoomIn, onZoomOut, onResetView }) {
       </div>
 
       <div className="canvas-topbar__right">
-        <button type="button" className="canvas-topbar__btn canvas-topbar__btn--accent">导出 PNG</button>
+        <button type="button" className="canvas-topbar__btn canvas-topbar__btn--accent">导出</button>
       </div>
     </header>
   )

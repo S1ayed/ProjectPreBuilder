@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 function ShapeStyleToolbar({
   position,
@@ -15,7 +15,7 @@ function ShapeStyleToolbar({
   onApplyPreset,
   onDeleteSelected,
 }) {
-  const dragRef = useRef({ isDragging: false, pointerId: null, lastClientX: 0, lastClientY: 0 })
+  const dragRef = useRef({ isDragging: false, lastClientX: 0, lastClientY: 0 })
   const [isHoveringBlankArea, setIsHoveringBlankArea] = useState(false)
   const [isDraggingToolbar, setIsDraggingToolbar] = useState(false)
 
@@ -27,22 +27,17 @@ function ShapeStyleToolbar({
     return Boolean(target.closest('button, input, select, textarea, label'))
   }
 
-  if (!position) {
-    return null
-  }
+  const handleToolbarPointerDownCapture = (event) => {
+    event.stopPropagation()
 
-  const handleToolbarPointerDown = (event) => {
     if (event.button !== 0 || isInteractiveTarget(event.target)) {
       return
     }
 
     event.preventDefault()
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
 
     dragRef.current = {
       isDragging: true,
-      pointerId: event.pointerId,
       lastClientX: event.clientX,
       lastClientY: event.clientY,
     }
@@ -51,22 +46,7 @@ function ShapeStyleToolbar({
   }
 
   const handleToolbarPointerMove = (event) => {
-    const dragState = dragRef.current
-    if (dragState.isDragging && dragState.pointerId === event.pointerId) {
-      event.preventDefault()
-      event.stopPropagation()
-      const deltaX = event.clientX - dragState.lastClientX
-      const deltaY = event.clientY - dragState.lastClientY
-
-      if ((deltaX !== 0 || deltaY !== 0) && typeof onToolbarOffsetDelta === 'function') {
-        onToolbarOffsetDelta({ deltaX, deltaY })
-      }
-
-      dragRef.current = {
-        ...dragState,
-        lastClientX: event.clientX,
-        lastClientY: event.clientY,
-      }
+    if (isDraggingToolbar) {
       return
     }
 
@@ -79,21 +59,65 @@ function ShapeStyleToolbar({
     }
   }
 
-  const handleToolbarPointerEnd = (event) => {
-    const dragState = dragRef.current
-    if (!dragState.isDragging || dragState.pointerId !== event.pointerId) {
+  // 拖动过程计算增量
+  useEffect(() => {
+    if (!isDraggingToolbar) {
+      return undefined
+    }
+
+    const handleWindowPointerMove = (event) => {
+      const dragState = dragRef.current
+      if (!dragState.isDragging) {
+        return
+      }
+
+      const deltaX = event.clientX - dragState.lastClientX
+      const deltaY = event.clientY - dragState.lastClientY
+
+      if ((deltaX !== 0 || deltaY !== 0) && typeof onToolbarOffsetDelta === 'function') {
+        onToolbarOffsetDelta({ deltaX, deltaY })
+      }
+
+      dragRef.current = {
+        ...dragState,
+        lastClientX: event.clientX,
+        lastClientY: event.clientY,
+      }
+    }
+
+    const stopDragging = () => {
+      if (!dragRef.current.isDragging) {
+        return
+      }
+
+      dragRef.current = { isDragging: false, lastClientX: 0, lastClientY: 0 }
+      setIsDraggingToolbar(false)
+      setIsHoveringBlankArea(false)
+    }
+
+    window.addEventListener('pointermove', handleWindowPointerMove)
+    window.addEventListener('pointerup', stopDragging)
+    window.addEventListener('pointercancel', stopDragging)
+
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove)
+      window.removeEventListener('pointerup', stopDragging)
+      window.removeEventListener('pointercancel', stopDragging)
+    }
+  }, [isDraggingToolbar, onToolbarOffsetDelta])
+
+  const handleToolbarPointerEnd = () => {
+    if (!dragRef.current.isDragging) {
       return
     }
 
-    event.preventDefault()
-    event.stopPropagation()
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-
-    dragRef.current = { isDragging: false, pointerId: null, lastClientX: 0, lastClientY: 0 }
+    dragRef.current = { isDragging: false, lastClientX: 0, lastClientY: 0 }
     setIsDraggingToolbar(false)
     setIsHoveringBlankArea(false)
+  }
+
+  if (!position) {
+    return null
   }
 
   return (
@@ -104,9 +128,8 @@ function ShapeStyleToolbar({
         top: `${position.top}px`,
         maxWidth: `${position.maxWidth}px`,
       }}
-      onPointerDownCapture={(event) => event.stopPropagation()}
+      onPointerDownCapture={handleToolbarPointerDownCapture}
       onMouseDownCapture={(event) => event.stopPropagation()}
-      onPointerDown={handleToolbarPointerDown}
       onPointerMove={handleToolbarPointerMove}
       onPointerLeave={handleToolbarPointerLeave}
       onPointerUp={handleToolbarPointerEnd}
