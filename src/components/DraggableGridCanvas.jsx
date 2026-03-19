@@ -7,6 +7,8 @@ const supportedShapeTypes = new Set(['rect', 'oval', 'diamond'])
 const PEN_STROKE_COLOR = '#1a73e8'
 const PEN_STROKE_WIDTH = 2.6
 const PEN_MOVE_THRESHOLD_PX = 2
+const CONNECTOR_STROKE_COLOR = '#2f5b8a'
+const CONNECTOR_STROKE_WIDTH = 2
 
 const defaultShapeSizes = {
   rect: { width: 120, height: 86 },
@@ -87,6 +89,64 @@ const getShapeBoundsWorld = (shape) => {
     y1: shape.y - size.height / 2,
     x2: shape.x + size.width / 2,
     y2: shape.y + size.height / 2,
+  }
+}
+
+const isPointInsideRect = (point, rect) => (
+  point.x >= rect.x1 && point.x <= rect.x2 && point.y >= rect.y1 && point.y <= rect.y2
+)
+
+const findTopShapeAtPoint = (point, shapeList) => {
+  for (let index = shapeList.length - 1; index >= 0; index -= 1) {
+    const shape = shapeList[index]
+    if (isPointInsideRect(point, getShapeBoundsWorld(shape))) {
+      return shape
+    }
+  }
+
+  return null
+}
+
+const getConnectionPairKey = (fromShapeId, toShapeId) => {
+  const orderedIds = [fromShapeId, toShapeId].sort()
+  return `${orderedIds[0]}::${orderedIds[1]}`
+}
+
+const getConnectorAnchorWorld = (shape, targetPoint) => {
+  const size = getShapeSize(shape)
+  const halfWidth = Math.max(1, size.width / 2)
+  const halfHeight = Math.max(1, size.height / 2)
+  const deltaX = targetPoint.x - shape.x
+  const deltaY = targetPoint.y - shape.y
+
+  if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) {
+    return { x: shape.x, y: shape.y }
+  }
+
+  if (shape.type === 'oval') {
+    const denominator = Math.sqrt((deltaX * deltaX) / (halfWidth * halfWidth) + (deltaY * deltaY) / (halfHeight * halfHeight)) || 1
+    const ratio = 1 / denominator
+    return {
+      x: shape.x + deltaX * ratio,
+      y: shape.y + deltaY * ratio,
+    }
+  }
+
+  if (shape.type === 'diamond') {
+    const denominator = Math.abs(deltaX) / halfWidth + Math.abs(deltaY) / halfHeight || 1
+    const ratio = 1 / denominator
+    return {
+      x: shape.x + deltaX * ratio,
+      y: shape.y + deltaY * ratio,
+    }
+  }
+
+  const denominator = Math.max(Math.abs(deltaX) / halfWidth, Math.abs(deltaY) / halfHeight) || 1
+  const ratio = 1 / denominator
+
+  return {
+    x: shape.x + deltaX * ratio,
+    y: shape.y + deltaY * ratio,
   }
 }
 
@@ -195,9 +255,12 @@ function DraggableGridCanvas({
   const viewportRef = useRef(null)
   const drawInteractionRef = useRef({ mode: 'idle' })
   const strokeIdRef = useRef(0)
+  const connectionIdRef = useRef(0)
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   const [penStrokes, setPenStrokes] = useState([])
+  const [shapeConnections, setShapeConnections] = useState([])
+  const [connectionSourceShapeId, setConnectionSourceShapeId] = useState(null)
 
   const isPenTool = activeTool === 'pen'
 
@@ -241,6 +304,17 @@ function DraggableGridCanvas({
   })
 
   const selectedShapeIdSet = new Set(selectedShapeIds)
+  const availableShapeIdSet = new Set(shapes.map((shape) => shape.id))
+  const activeConnectionSourceShapeId = (
+    connectionSourceShapeId
+    && !isPenTool
+    && selectedShapeIds.length === 1
+    && selectedShapeIds[0] === connectionSourceShapeId
+    && availableShapeIdSet.has(connectionSourceShapeId)
+  )
+    ? connectionSourceShapeId
+    : null
+  const isConnecting = Boolean(activeConnectionSourceShapeId)
 
   const startPenStroke = (event) => {
     if (event.button !== 0 || !viewportRef.current) {
@@ -315,9 +389,57 @@ function DraggableGridCanvas({
     return true
   }
 
+  const createConnectionBetweenShapes = useCallback((fromShapeId, toShapeId) => {
+    if (!fromShapeId || !toShapeId || fromShapeId === toShapeId) {
+      return
+    }
+
+    const nextPairKey = getConnectionPairKey(fromShapeId, toShapeId)
+    const currentShapeIdSet = new Set(shapes.map((shape) => shape.id))
+    setShapeConnections((previousConnections) => {
+      const validConnections = previousConnections.filter((connection) => (
+        currentShapeIdSet.has(connection.fromShapeId) && currentShapeIdSet.has(connection.toShapeId)
+      ))
+      const hasConnection = validConnections.some((connection) => (
+        getConnectionPairKey(connection.fromShapeId, connection.toShapeId) === nextPairKey
+      ))
+
+      if (hasConnection) {
+        return validConnections
+      }
+
+      const nextConnection = {
+        id: `connection-${connectionIdRef.current}`,
+        fromShapeId,
+        toShapeId,
+      }
+      connectionIdRef.current += 1
+
+      return [...validConnections, nextConnection]
+    })
+  }, [shapes])
+
   const handleViewportPointerDown = (event) => {
     if (isPenTool && event.button === 0) {
       startPenStroke(event)
+      return
+    }
+
+    if (isConnecting && event.button === 0) {
+      const worldPoint = getWorldPoint(event, event.currentTarget, viewport)
+      const hitShape = findTopShapeAtPoint(worldPoint, shapes)
+
+      event.preventDefault()
+      if (!hitShape) {
+        return
+      }
+
+      if (hitShape.id === activeConnectionSourceShapeId) {
+        setConnectionSourceShapeId(null)
+        return
+      }
+
+      createConnectionBetweenShapes(activeConnectionSourceShapeId, hitShape.id)
       return
     }
 
@@ -447,6 +569,17 @@ function DraggableGridCanvas({
 
   const marqueeStyle = getMarqueeStyle()
 
+  const toggleConnectionMode = useCallback(() => {
+    if (selectedShapeIds.length !== 1) {
+      return
+    }
+
+    const [nextSourceShapeId] = selectedShapeIds
+    setConnectionSourceShapeId((previousSourceShapeId) => (
+      previousSourceShapeId === nextSourceShapeId ? null : nextSourceShapeId
+    ))
+  }, [selectedShapeIds])
+
   const applyStylePatchToSelection = (stylePatch) => {
     if (selectedShapeIds.length === 0) {
       return
@@ -470,6 +603,9 @@ function DraggableGridCanvas({
     }
 
     const selectedIds = new Set(selectedShapeIds)
+    setShapeConnections((previousConnections) => previousConnections.filter((connection) => (
+      !selectedIds.has(connection.fromShapeId) && !selectedIds.has(connection.toShapeId)
+    )))
     onShapesChange((previousShapes) => previousShapes.filter((shape) => !selectedIds.has(shape.id)))
     clearSelection()
   }, [selectedShapeIds, onShapesChange, clearSelection])
@@ -506,6 +642,30 @@ function DraggableGridCanvas({
   const selectedBoundsWorld = getSelectedBoundsWorld(shapes, selectedShapeIdSet)
   const selectedShapes = shapes.filter((shape) => selectedShapeIdSet.has(shape.id))
   const activeStyleSample = selectedShapes.length > 0 ? getShapeVisualStyle(selectedShapes[0]) : defaultShapeStyles
+  const canToggleConnectionMode = isConnecting || selectedShapeIds.length === 1
+  const shapeById = new Map(shapes.map((shape) => [shape.id, shape]))
+  const validShapeConnections = shapeConnections.filter((connection) => (
+    shapeById.has(connection.fromShapeId) && shapeById.has(connection.toShapeId)
+  ))
+  const connectorSegments = validShapeConnections.map((connection) => {
+    const fromShape = shapeById.get(connection.fromShapeId)
+    const toShape = shapeById.get(connection.toShapeId)
+
+    if (!fromShape || !toShape) {
+      return null
+    }
+
+    const fromCenter = { x: fromShape.x, y: fromShape.y }
+    const toCenter = { x: toShape.x, y: toShape.y }
+    const startWorld = getConnectorAnchorWorld(fromShape, toCenter)
+    const endWorld = getConnectorAnchorWorld(toShape, fromCenter)
+
+    return {
+      id: connection.id,
+      start: worldToScreenPoint(startWorld, viewport),
+      end: worldToScreenPoint(endWorld, viewport),
+    }
+  }).filter(Boolean)
   const horizontalRulerMarks = showRuler
     ? getRulerMarks({ trackLength: viewportSize.width, offsetPx: viewport.x, zoom: viewport.zoom })
     : []
@@ -537,7 +697,7 @@ function DraggableGridCanvas({
     <section className="grid-workspace" aria-label="绘图工作区">
       <div
         ref={viewportRef}
-        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''}`}
+        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''} ${isConnecting ? 'is-connecting' : ''}`}
         onPointerDown={handleViewportPointerDown}
         onPointerMove={handleViewportPointerMove}
         onPointerUp={handleViewportPointerUp}
@@ -557,6 +717,9 @@ function DraggableGridCanvas({
             onStrokeColorChange={(strokeColor) => applyStylePatchToSelection({ strokeColor })}
             onStrokeWidthChange={(strokeWidth) => applyStylePatchToSelection({ strokeWidth })}
             onOpacityChange={(opacity) => applyStylePatchToSelection({ opacity })}
+            onConnectSelected={toggleConnectionMode}
+            canConnectSelected={canToggleConnectionMode}
+            isConnectMode={isConnecting}
             onApplyPreset={(preset) => {
               if (preset === 'outline') {
                 applyStylePatchToSelection({
@@ -630,6 +793,23 @@ function DraggableGridCanvas({
                 />
               )
             })}
+          </svg>
+        )}
+
+        {connectorSegments.length > 0 && (
+          <svg className="grid-workspace__connection-layer" aria-hidden="true">
+            {connectorSegments.map((segment) => (
+              <line
+                key={segment.id}
+                className="grid-workspace__connection-line"
+                x1={segment.start.x}
+                y1={segment.start.y}
+                x2={segment.end.x}
+                y2={segment.end.y}
+                stroke={CONNECTOR_STROKE_COLOR}
+                strokeWidth={CONNECTOR_STROKE_WIDTH}
+              />
+            ))}
           </svg>
         )}
 
@@ -707,6 +887,8 @@ function DraggableGridCanvas({
 
       <div className="grid-workspace__status">
         <span>Shapes: {shapes.length}</span>
+        <span>Connections: {validShapeConnections.length}</span>
+        <span>Connect Mode: {isConnecting ? 'On' : 'Off'}</span>
         <span>Selected: {selectedShapeIds.length}</span>
         <span>Offset X: {Math.round(viewport.x)}</span>
         <span>Offset Y: {Math.round(viewport.y)}</span>
