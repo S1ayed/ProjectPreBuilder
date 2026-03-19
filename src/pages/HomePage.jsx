@@ -2,19 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import WorkbenchSidebar from '../components/WorkbenchSidebar'
 import CanvasTopBar from '../components/CanvasTopBar'
 import DraggableGridCanvas from '../components/DraggableGridCanvas'
+import { layerItems } from '../constants/layerItems'
+import { toolItems } from '../constants/toolItems'
 import './HomePage.css'
-
-const toolItems = [
-  { id: 'select', name: '选择', shortcut: 'V' },
-  { id: 'pen', name: '画笔', shortcut: 'P' },
-  { id: 'text', name: '文字', shortcut: 'T' },
-]
-
-const layerItems = [
-  { id: 'layer-1', name: 'Background Grid', type: 'Guide' },
-  { id: 'layer-2', name: 'Wireframe Group', type: 'Group' },
-  { id: 'layer-3', name: 'Notes', type: 'Text' },
-]
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 const RESIZE_BREAKPOINT = 980

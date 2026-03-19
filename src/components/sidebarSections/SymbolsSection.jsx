@@ -16,7 +16,6 @@ function SymbolsSection({ tools, activeTool, onSelectTool }) {
                 onClick={() => onSelectTool(tool.id)}
               >
                 <span>{tool.name}</span>
-                <small>{tool.shortcut}</small>
               </button>
             </li>
           )

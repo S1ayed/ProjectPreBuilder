@@ -1,246 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ShapeStyleToolbar from './ShapeStyleToolbar'
 import { useCanvasMouseActions } from '../movements/canvasMouseActions'
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
-const supportedShapeTypes = new Set(['rect', 'oval', 'diamond'])
-const PEN_STROKE_COLOR = '#1a73e8'
-const PEN_STROKE_WIDTH = 2.6
-const PEN_MOVE_THRESHOLD_PX = 2
-const CONNECTOR_STROKE_COLOR = '#2f5b8a'
-const CONNECTOR_STROKE_WIDTH = 2
-
-const defaultShapeSizes = {
-  rect: { width: 120, height: 86 },
-  oval: { width: 128, height: 88 },
-  diamond: { width: 108, height: 108 },
-}
-
-const defaultShapeStyles = {
-  fillColor: '#6f9ee0',
-  strokeColor: '#51618f',
-  strokeWidth: 2,
-  opacity: 1,
-}
-
-const hasShapePayload = (dataTransfer) => {
-  const types = Array.from(dataTransfer.types || [])
-  return (
-    types.includes('application/x-workbench-shape')
-    || types.includes('application/json')
-    || types.includes('text/plain')
-  )
-}
-
-const extractShapeType = (dataTransfer) => {
-  const directType = dataTransfer.getData('application/x-workbench-shape')
-  if (supportedShapeTypes.has(directType)) {
-    return directType
-  }
-
-  const jsonPayload = dataTransfer.getData('application/json')
-  if (jsonPayload) {
-    try {
-      const parsed = JSON.parse(jsonPayload)
-      if (supportedShapeTypes.has(parsed.shapeType)) {
-        return parsed.shapeType
-      }
-    } catch {
-      // Ignore invalid JSON payload from non-workbench drags.
-    }
-  }
-
-  const plainText = dataTransfer.getData('text/plain')
-  if (supportedShapeTypes.has(plainText)) {
-    return plainText
-  }
-
-  return ''
-}
-
-const getWorldPoint = (event, viewportElement, viewport) => {
-  const rect = viewportElement.getBoundingClientRect()
-  const localX = event.clientX - rect.left
-  const localY = event.clientY - rect.top
-
-  return {
-    x: (localX - viewport.x) / viewport.zoom,
-    y: (localY - viewport.y) / viewport.zoom,
-  }
-}
-
-const getShapeScreenPosition = (shape, viewport) => ({
-  left: shape.x * viewport.zoom + viewport.x,
-  top: shape.y * viewport.zoom + viewport.y,
-})
-
-const getShapeSize = (shape) => {
-  if (typeof shape.width === 'number' && typeof shape.height === 'number' && shape.width > 0 && shape.height > 0) {
-    return { width: shape.width, height: shape.height }
-  }
-
-  return defaultShapeSizes[shape.type] || defaultShapeSizes.rect
-}
-
-const getShapeBoundsWorld = (shape) => {
-  const size = getShapeSize(shape)
-  return {
-    x1: shape.x - size.width / 2,
-    y1: shape.y - size.height / 2,
-    x2: shape.x + size.width / 2,
-    y2: shape.y + size.height / 2,
-  }
-}
-
-const isPointInsideRect = (point, rect) => (
-  point.x >= rect.x1 && point.x <= rect.x2 && point.y >= rect.y1 && point.y <= rect.y2
-)
-
-const findTopShapeAtPoint = (point, shapeList) => {
-  for (let index = shapeList.length - 1; index >= 0; index -= 1) {
-    const shape = shapeList[index]
-    if (isPointInsideRect(point, getShapeBoundsWorld(shape))) {
-      return shape
-    }
-  }
-
-  return null
-}
-
-const getConnectionPairKey = (fromShapeId, toShapeId) => {
-  const orderedIds = [fromShapeId, toShapeId].sort()
-  return `${orderedIds[0]}::${orderedIds[1]}`
-}
-
-const getConnectorAnchorWorld = (shape, targetPoint) => {
-  const size = getShapeSize(shape)
-  const halfWidth = Math.max(1, size.width / 2)
-  const halfHeight = Math.max(1, size.height / 2)
-  const deltaX = targetPoint.x - shape.x
-  const deltaY = targetPoint.y - shape.y
-
-  if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) {
-    return { x: shape.x, y: shape.y }
-  }
-
-  if (shape.type === 'oval') {
-    const denominator = Math.sqrt((deltaX * deltaX) / (halfWidth * halfWidth) + (deltaY * deltaY) / (halfHeight * halfHeight)) || 1
-    const ratio = 1 / denominator
-    return {
-      x: shape.x + deltaX * ratio,
-      y: shape.y + deltaY * ratio,
-    }
-  }
-
-  if (shape.type === 'diamond') {
-    const denominator = Math.abs(deltaX) / halfWidth + Math.abs(deltaY) / halfHeight || 1
-    const ratio = 1 / denominator
-    return {
-      x: shape.x + deltaX * ratio,
-      y: shape.y + deltaY * ratio,
-    }
-  }
-
-  const denominator = Math.max(Math.abs(deltaX) / halfWidth, Math.abs(deltaY) / halfHeight) || 1
-  const ratio = 1 / denominator
-
-  return {
-    x: shape.x + deltaX * ratio,
-    y: shape.y + deltaY * ratio,
-  }
-}
-
-const worldToScreenPoint = (worldPoint, viewport) => ({
-  x: worldPoint.x * viewport.zoom + viewport.x,
-  y: worldPoint.y * viewport.zoom + viewport.y,
-})
-
-const buildStrokePathData = (points, viewport) => {
-  if (!points || points.length === 0) {
-    return ''
-  }
-
-  const first = worldToScreenPoint(points[0], viewport)
-  const commands = [`M ${first.x} ${first.y}`]
-
-  for (let index = 1; index < points.length; index += 1) {
-    const point = worldToScreenPoint(points[index], viewport)
-    commands.push(`L ${point.x} ${point.y}`)
-  }
-
-  return commands.join(' ')
-}
-
-const getRulerMarks = ({ trackLength, offsetPx, zoom }) => {
-  if (trackLength <= 0 || zoom <= 0) {
-    return []
-  }
-
-  const targetStepPx = 72
-  const roughWorldStep = targetStepPx / zoom
-  const worldStep = Math.max(20, Math.round(roughWorldStep / 10) * 10)
-  const worldStart = (-offsetPx) / zoom
-  const worldEnd = (trackLength - offsetPx) / zoom
-  const firstMark = Math.floor(worldStart / worldStep) * worldStep
-  const marks = []
-
-  for (let worldValue = firstMark; worldValue <= worldEnd; worldValue += worldStep) {
-    const screenValue = worldValue * zoom + offsetPx
-    marks.push({
-      worldValue: Math.round(worldValue),
-      screenValue,
-    })
-  }
-
-  return marks
-}
-
-const getAlignmentGuideLines = (boundsWorld, viewport) => {
-  if (!boundsWorld) {
-    return []
-  }
-
-  const centerX = (boundsWorld.x1 + boundsWorld.x2) / 2
-  const centerY = (boundsWorld.y1 + boundsWorld.y2) / 2
-
-  return [
-    { id: 'x-start', orientation: 'vertical', position: worldToScreenPoint({ x: boundsWorld.x1, y: 0 }, viewport).x, emphasis: 'edge' },
-    { id: 'x-center', orientation: 'vertical', position: worldToScreenPoint({ x: centerX, y: 0 }, viewport).x, emphasis: 'center' },
-    { id: 'x-end', orientation: 'vertical', position: worldToScreenPoint({ x: boundsWorld.x2, y: 0 }, viewport).x, emphasis: 'edge' },
-    { id: 'y-start', orientation: 'horizontal', position: worldToScreenPoint({ x: 0, y: boundsWorld.y1 }, viewport).y, emphasis: 'edge' },
-    { id: 'y-center', orientation: 'horizontal', position: worldToScreenPoint({ x: 0, y: centerY }, viewport).y, emphasis: 'center' },
-    { id: 'y-end', orientation: 'horizontal', position: worldToScreenPoint({ x: 0, y: boundsWorld.y2 }, viewport).y, emphasis: 'edge' },
-  ]
-}
-
-const getShapeVisualStyle = (shape) => ({
-  fillColor: shape.fillColor || defaultShapeStyles.fillColor,
-  strokeColor: shape.strokeColor || defaultShapeStyles.strokeColor,
-  strokeWidth: typeof shape.strokeWidth === 'number' ? shape.strokeWidth : defaultShapeStyles.strokeWidth,
-  opacity: typeof shape.opacity === 'number' ? shape.opacity : defaultShapeStyles.opacity,
-})
-
-const getSelectedBoundsWorld = (shapeList, selectedIdSet) => {
-  const selectedShapes = shapeList.filter((shape) => selectedIdSet.has(shape.id))
-  if (selectedShapes.length === 0) {
-    return null
-  }
-
-  return selectedShapes.reduce((accumulator, shape) => {
-    const bounds = getShapeBoundsWorld(shape)
-    return {
-      x1: Math.min(accumulator.x1, bounds.x1),
-      y1: Math.min(accumulator.y1, bounds.y1),
-      x2: Math.max(accumulator.x2, bounds.x2),
-      y2: Math.max(accumulator.y2, bounds.y2),
-    }
-  }, {
-    x1: Number.POSITIVE_INFINITY,
-    y1: Number.POSITIVE_INFINITY,
-    x2: Number.NEGATIVE_INFINITY,
-    y2: Number.NEGATIVE_INFINITY,
-  })
-}
+import { usePenStrokes } from '../hooks/usePenStrokes'
+import { useShapeConnections } from '../hooks/useShapeConnections'
+import { useToolbarPosition } from '../hooks/useToolbarPosition'
+import {
+  buildStrokePathData,
+  clamp,
+  CONNECTOR_STROKE_COLOR,
+  CONNECTOR_STROKE_WIDTH,
+  defaultShapeStyles,
+  extractShapeType,
+  getAlignmentGuideLines,
+  getRulerMarks,
+  getSelectedBoundsWorld,
+  getShapeBoundsWorld,
+  getShapeScreenPosition,
+  getShapeSize,
+  getShapeVisualStyle,
+  getWorldPoint,
+  hasShapePayload,
+  PEN_MOVE_THRESHOLD_PX,
+  PEN_STROKE_COLOR,
+  PEN_STROKE_WIDTH,
+  supportedShapeTypes,
+  worldToScreenPoint,
+} from './canvas/canvasUtils'
 
 function DraggableGridCanvas({
   viewport,
@@ -253,21 +38,8 @@ function DraggableGridCanvas({
   showAlignmentGuides,
 }) {
   const viewportRef = useRef(null)
-  const drawInteractionRef = useRef({ mode: 'idle' })
-  const strokeIdRef = useRef(0)
-  const connectionIdRef = useRef(0)
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
-  const [penStrokes, setPenStrokes] = useState([])
-  const [shapeConnections, setShapeConnections] = useState([])
-  const [connectionSourceShapeId, setConnectionSourceShapeId] = useState(null)
-  const [toolbarScreenPosition, setToolbarScreenPosition] = useState({
-    selectionKey: '',
-    left: 0,
-    top: 0,
-    anchorWorldX: 0,
-    anchorWorldY: 0,
-  })
 
   const isPenTool = activeTool === 'pen'
 
@@ -312,122 +84,31 @@ function DraggableGridCanvas({
   })
 
   const selectedShapeIdSet = new Set(selectedShapeIds)
-  const availableShapeIdSet = new Set(shapes.map((shape) => shape.id))
-  const selectionKey = [...selectedShapeIds].sort().join('|')
-  const activeConnectionSourceShapeId = (
-    connectionSourceShapeId
-    && !isPenTool
-    && selectedShapeIds.length === 1
-    && selectedShapeIds[0] === connectionSourceShapeId
-    && availableShapeIdSet.has(connectionSourceShapeId)
-  )
-    ? connectionSourceShapeId
-    : null
-  const isConnecting = Boolean(activeConnectionSourceShapeId)
-
-  const startPenStroke = (event) => {
-    if (event.button !== 0 || !viewportRef.current) {
-      return false
-    }
-
-    event.preventDefault()
-    const startPoint = getWorldPoint(event, event.currentTarget, viewport)
-    const strokeId = `stroke-${strokeIdRef.current}`
-    strokeIdRef.current += 1
-
-    setPenStrokes((previous) => [...previous, {
-      id: strokeId,
-      points: [startPoint],
-    }])
-
-    viewportRef.current.setPointerCapture(event.pointerId)
-    drawInteractionRef.current = {
-      mode: 'drawing',
-      pointerId: event.pointerId,
-      strokeId,
-      lastClientX: event.clientX,
-      lastClientY: event.clientY,
-    }
-
-    return true
-  }
-
-  const appendPenStrokePoint = (event) => {
-    const interaction = drawInteractionRef.current
-    if (interaction.mode !== 'drawing' || interaction.pointerId !== event.pointerId) {
-      return false
-    }
-
-    const deltaX = event.clientX - interaction.lastClientX
-    const deltaY = event.clientY - interaction.lastClientY
-    if (Math.hypot(deltaX, deltaY) < PEN_MOVE_THRESHOLD_PX) {
-      return true
-    }
-
-    const nextPoint = getWorldPoint(event, event.currentTarget, viewport)
-    setPenStrokes((previous) => previous.map((stroke) => {
-      if (stroke.id !== interaction.strokeId) {
-        return stroke
-      }
-
-      return {
-        ...stroke,
-        points: [...stroke.points, nextPoint],
-      }
-    }))
-
-    drawInteractionRef.current = {
-      ...interaction,
-      lastClientX: event.clientX,
-      lastClientY: event.clientY,
-    }
-    return true
-  }
-
-  const finishPenStroke = (event) => {
-    const interaction = drawInteractionRef.current
-    if (interaction.mode !== 'drawing' || interaction.pointerId !== event.pointerId) {
-      return false
-    }
-
-    if (viewportRef.current && viewportRef.current.hasPointerCapture(event.pointerId)) {
-      viewportRef.current.releasePointerCapture(event.pointerId)
-    }
-
-    drawInteractionRef.current = { mode: 'idle' }
-    return true
-  }
-
-  const createConnectionBetweenShapes = useCallback((fromShapeId, toShapeId) => {
-    if (!fromShapeId || !toShapeId || fromShapeId === toShapeId) {
-      return false
-    }
-
-    const nextPairKey = getConnectionPairKey(fromShapeId, toShapeId)
-    const currentShapeIdSet = new Set(shapes.map((shape) => shape.id))
-    const validConnections = shapeConnections.filter((connection) => (
-      currentShapeIdSet.has(connection.fromShapeId) && currentShapeIdSet.has(connection.toShapeId)
-    ))
-    const hasConnection = validConnections.some((connection) => (
-      getConnectionPairKey(connection.fromShapeId, connection.toShapeId) === nextPairKey
-    ))
-
-    if (hasConnection) {
-      if (validConnections.length !== shapeConnections.length) {
-        setShapeConnections(validConnections)
-      }
-      return false
-    }
-
-    const nextConnection = {
-      id: `connection-${connectionIdRef.current}`,
-      fromShapeId,
-      toShapeId,
-    }
-    connectionIdRef.current += 1
-    setShapeConnections([...validConnections, nextConnection])
-    return true
-  }, [shapes, shapeConnections])
+  const {
+    penStrokes,
+    startPenStroke,
+    appendPenStrokePoint,
+    finishPenStroke,
+  } = usePenStrokes({
+    viewport,
+    viewportRef,
+    getWorldPoint,
+    moveThresholdPx: PEN_MOVE_THRESHOLD_PX,
+  })
+  const {
+    isConnecting,
+    canToggleConnectionMode,
+    toggleConnectionMode,
+    tryHandleConnectionPointerDown,
+    removeConnectionsByShapeIds,
+    validShapeConnections,
+    connectorSegments,
+  } = useShapeConnections({
+    shapes,
+    selectedShapeIds,
+    isPenTool,
+    viewport,
+  })
 
   const handleViewportPointerDown = (event) => {
     if (isPenTool && event.button === 0) {
@@ -435,24 +116,7 @@ function DraggableGridCanvas({
       return
     }
 
-    if (isConnecting && event.button === 0) {
-      const worldPoint = getWorldPoint(event, event.currentTarget, viewport)
-      const hitShape = findTopShapeAtPoint(worldPoint, shapes)
-
-      event.preventDefault()
-      if (!hitShape) {
-        return
-      }
-
-      if (hitShape.id === activeConnectionSourceShapeId) {
-        setConnectionSourceShapeId(null)
-        return
-      }
-
-      const didConnect = createConnectionBetweenShapes(activeConnectionSourceShapeId, hitShape.id)
-      if (didConnect) {
-        setConnectionSourceShapeId(null)
-      }
+    if (tryHandleConnectionPointerDown(event)) {
       return
     }
 
@@ -460,8 +124,7 @@ function DraggableGridCanvas({
   }
 
   const handleViewportPointerMove = (event) => {
-    if (drawInteractionRef.current.mode === 'drawing') {
-      appendPenStrokePoint(event)
+    if (appendPenStrokePoint(event)) {
       return
     }
 
@@ -582,17 +245,6 @@ function DraggableGridCanvas({
 
   const marqueeStyle = getMarqueeStyle()
 
-  const toggleConnectionMode = useCallback(() => {
-    if (selectedShapeIds.length !== 1) {
-      return
-    }
-
-    const [nextSourceShapeId] = selectedShapeIds
-    setConnectionSourceShapeId((previousSourceShapeId) => (
-      previousSourceShapeId === nextSourceShapeId ? null : nextSourceShapeId
-    ))
-  }, [selectedShapeIds])
-
   const applyStylePatchToSelection = (stylePatch) => {
     if (selectedShapeIds.length === 0) {
       return
@@ -615,13 +267,11 @@ function DraggableGridCanvas({
       return
     }
 
+    removeConnectionsByShapeIds(selectedShapeIds)
     const selectedIds = new Set(selectedShapeIds)
-    setShapeConnections((previousConnections) => previousConnections.filter((connection) => (
-      !selectedIds.has(connection.fromShapeId) && !selectedIds.has(connection.toShapeId)
-    )))
     onShapesChange((previousShapes) => previousShapes.filter((shape) => !selectedIds.has(shape.id)))
     clearSelection()
-  }, [selectedShapeIds, onShapesChange, clearSelection])
+  }, [selectedShapeIds, onShapesChange, clearSelection, removeConnectionsByShapeIds])
 
   useEffect(() => {
     const handleDeleteKey = (event) => {
@@ -655,30 +305,6 @@ function DraggableGridCanvas({
   const selectedBoundsWorld = getSelectedBoundsWorld(shapes, selectedShapeIdSet)
   const selectedShapes = shapes.filter((shape) => selectedShapeIdSet.has(shape.id))
   const activeStyleSample = selectedShapes.length > 0 ? getShapeVisualStyle(selectedShapes[0]) : defaultShapeStyles
-  const canToggleConnectionMode = isConnecting || selectedShapeIds.length === 1
-  const shapeById = new Map(shapes.map((shape) => [shape.id, shape]))
-  const validShapeConnections = shapeConnections.filter((connection) => (
-    shapeById.has(connection.fromShapeId) && shapeById.has(connection.toShapeId)
-  ))
-  const connectorSegments = validShapeConnections.map((connection) => {
-    const fromShape = shapeById.get(connection.fromShapeId)
-    const toShape = shapeById.get(connection.toShapeId)
-
-    if (!fromShape || !toShape) {
-      return null
-    }
-
-    const fromCenter = { x: fromShape.x, y: fromShape.y }
-    const toCenter = { x: toShape.x, y: toShape.y }
-    const startWorld = getConnectorAnchorWorld(fromShape, toCenter)
-    const endWorld = getConnectorAnchorWorld(toShape, fromCenter)
-
-    return {
-      id: connection.id,
-      start: worldToScreenPoint(startWorld, viewport),
-      end: worldToScreenPoint(endWorld, viewport),
-    }
-  }).filter(Boolean)
   const horizontalRulerMarks = showRuler
     ? getRulerMarks({ trackLength: viewportSize.width, offsetPx: viewport.x, zoom: viewport.zoom })
     : []
@@ -686,39 +312,13 @@ function DraggableGridCanvas({
     ? getRulerMarks({ trackLength: viewportSize.height, offsetPx: viewport.y, zoom: viewport.zoom })
     : []
   const alignmentGuideLines = showAlignmentGuides ? getAlignmentGuideLines(selectedBoundsWorld, viewport) : []
-  const toolbarAnchorWorld = selectedBoundsWorld
-    ? {
-      x: (selectedBoundsWorld.x1 + selectedBoundsWorld.x2) / 2,
-      y: selectedBoundsWorld.y1,
-    }
-    : null
-
-  const getToolbarPosition = () => {
-    if (!showSelectionToolbar || !selectedBoundsWorld || !toolbarAnchorWorld) {
-      return null
-    }
-
-    const centerScreen = worldToScreenPoint(toolbarAnchorWorld, viewport)
-    const anchorLeft = centerScreen.x
-    const anchorTop = centerScreen.y - 12
-    const hasPinnedScreenPosition = toolbarScreenPosition.selectionKey === selectionKey
-    const anchorScreenDeltaX = hasPinnedScreenPosition
-      ? (toolbarAnchorWorld.x - toolbarScreenPosition.anchorWorldX) * viewport.zoom
-      : 0
-    const anchorScreenDeltaY = hasPinnedScreenPosition
-      ? (toolbarAnchorWorld.y - toolbarScreenPosition.anchorWorldY) * viewport.zoom
-      : 0
-    const rawLeft = hasPinnedScreenPosition ? toolbarScreenPosition.left + anchorScreenDeltaX : anchorLeft
-    const rawTop = hasPinnedScreenPosition ? toolbarScreenPosition.top + anchorScreenDeltaY : anchorTop
-
-    return {
-      left: clamp(rawLeft, 12, Math.max(12, viewportSize.width - 12)),
-      top: clamp(rawTop, 18, Math.max(18, viewportSize.height - 18)),
-      maxWidth: 640,
-    }
-  }
-
-  const toolbarPosition = getToolbarPosition()
+  const { toolbarPosition, onToolbarOffsetDelta } = useToolbarPosition({
+    showSelectionToolbar,
+    selectedShapeIds,
+    selectedBoundsWorld,
+    viewport,
+    viewportSize,
+  })
 
   return (
     <section className="grid-workspace" aria-label="绘图工作区">
@@ -747,19 +347,7 @@ function DraggableGridCanvas({
             onConnectSelected={toggleConnectionMode}
             canConnectSelected={canToggleConnectionMode}
             isConnectMode={isConnecting}
-            onToolbarOffsetDelta={({ deltaX, deltaY }) => {
-              if (!toolbarAnchorWorld) {
-                return
-              }
-
-              setToolbarScreenPosition((previous) => ({
-                selectionKey,
-                left: (previous.selectionKey === selectionKey ? previous.left : toolbarPosition.left) + deltaX,
-                top: (previous.selectionKey === selectionKey ? previous.top : toolbarPosition.top) + deltaY,
-                anchorWorldX: previous.selectionKey === selectionKey ? previous.anchorWorldX : toolbarAnchorWorld.x,
-                anchorWorldY: previous.selectionKey === selectionKey ? previous.anchorWorldY : toolbarAnchorWorld.y,
-              }))
-            }}
+            onToolbarOffsetDelta={onToolbarOffsetDelta}
             onApplyPreset={(preset) => {
               if (preset === 'outline') {
                 applyStylePatchToSelection({

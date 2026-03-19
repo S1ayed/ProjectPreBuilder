@@ -286,10 +286,6 @@
   cursor: pointer;
 }
 
-.workbench-sidebar__tool small {
-  color: var(--text-subtle);
-}
-
 .workbench-sidebar__tool.is-active {
   border-color: #8fc9a7;
   background: var(--accent-soft);
