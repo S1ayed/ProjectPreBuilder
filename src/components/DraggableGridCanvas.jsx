@@ -261,6 +261,7 @@ function DraggableGridCanvas({
   const [penStrokes, setPenStrokes] = useState([])
   const [shapeConnections, setShapeConnections] = useState([])
   const [connectionSourceShapeId, setConnectionSourceShapeId] = useState(null)
+  const [toolbarScreenPosition, setToolbarScreenPosition] = useState({ selectionKey: '', left: 0, top: 0 })
 
   const isPenTool = activeTool === 'pen'
 
@@ -305,6 +306,7 @@ function DraggableGridCanvas({
 
   const selectedShapeIdSet = new Set(selectedShapeIds)
   const availableShapeIdSet = new Set(shapes.map((shape) => shape.id))
+  const selectionKey = [...selectedShapeIds].sort().join('|')
   const activeConnectionSourceShapeId = (
     connectionSourceShapeId
     && !isPenTool
@@ -391,33 +393,34 @@ function DraggableGridCanvas({
 
   const createConnectionBetweenShapes = useCallback((fromShapeId, toShapeId) => {
     if (!fromShapeId || !toShapeId || fromShapeId === toShapeId) {
-      return
+      return false
     }
 
     const nextPairKey = getConnectionPairKey(fromShapeId, toShapeId)
     const currentShapeIdSet = new Set(shapes.map((shape) => shape.id))
-    setShapeConnections((previousConnections) => {
-      const validConnections = previousConnections.filter((connection) => (
-        currentShapeIdSet.has(connection.fromShapeId) && currentShapeIdSet.has(connection.toShapeId)
-      ))
-      const hasConnection = validConnections.some((connection) => (
-        getConnectionPairKey(connection.fromShapeId, connection.toShapeId) === nextPairKey
-      ))
+    const validConnections = shapeConnections.filter((connection) => (
+      currentShapeIdSet.has(connection.fromShapeId) && currentShapeIdSet.has(connection.toShapeId)
+    ))
+    const hasConnection = validConnections.some((connection) => (
+      getConnectionPairKey(connection.fromShapeId, connection.toShapeId) === nextPairKey
+    ))
 
-      if (hasConnection) {
-        return validConnections
+    if (hasConnection) {
+      if (validConnections.length !== shapeConnections.length) {
+        setShapeConnections(validConnections)
       }
+      return false
+    }
 
-      const nextConnection = {
-        id: `connection-${connectionIdRef.current}`,
-        fromShapeId,
-        toShapeId,
-      }
-      connectionIdRef.current += 1
-
-      return [...validConnections, nextConnection]
-    })
-  }, [shapes])
+    const nextConnection = {
+      id: `connection-${connectionIdRef.current}`,
+      fromShapeId,
+      toShapeId,
+    }
+    connectionIdRef.current += 1
+    setShapeConnections([...validConnections, nextConnection])
+    return true
+  }, [shapes, shapeConnections])
 
   const handleViewportPointerDown = (event) => {
     if (isPenTool && event.button === 0) {
@@ -439,7 +442,10 @@ function DraggableGridCanvas({
         return
       }
 
-      createConnectionBetweenShapes(activeConnectionSourceShapeId, hitShape.id)
+      const didConnect = createConnectionBetweenShapes(activeConnectionSourceShapeId, hitShape.id)
+      if (didConnect) {
+        setConnectionSourceShapeId(null)
+      }
       return
     }
 
@@ -683,10 +689,15 @@ function DraggableGridCanvas({
     const selectedTop = selectedBoundsWorld.y1
 
     const centerScreen = worldToScreenPoint({ x: selectedCenterX, y: selectedTop }, viewport)
+    const anchorLeft = centerScreen.x
+    const anchorTop = centerScreen.y - 12
+    const hasPinnedScreenPosition = toolbarScreenPosition.selectionKey === selectionKey
+    const rawLeft = hasPinnedScreenPosition ? toolbarScreenPosition.left : anchorLeft
+    const rawTop = hasPinnedScreenPosition ? toolbarScreenPosition.top : anchorTop
 
     return {
-      left: centerScreen.x,
-      top: Math.max(66, centerScreen.y - 12),
+      left: clamp(rawLeft, 12, Math.max(12, viewportSize.width - 12)),
+      top: clamp(rawTop, 18, Math.max(18, viewportSize.height - 18)),
       maxWidth: 640,
     }
   }
@@ -720,6 +731,13 @@ function DraggableGridCanvas({
             onConnectSelected={toggleConnectionMode}
             canConnectSelected={canToggleConnectionMode}
             isConnectMode={isConnecting}
+            onToolbarOffsetDelta={({ deltaX, deltaY }) => {
+              setToolbarScreenPosition((previous) => ({
+                selectionKey,
+                left: (previous.selectionKey === selectionKey ? previous.left : toolbarPosition.left) + deltaX,
+                top: (previous.selectionKey === selectionKey ? previous.top : toolbarPosition.top) + deltaY,
+              }))
+            }}
             onApplyPreset={(preset) => {
               if (preset === 'outline') {
                 applyStylePatchToSelection({

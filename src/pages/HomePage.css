@@ -689,7 +689,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 6px 20px 10px 8px;
   border: 1px solid #d6dde7;
   border-radius: 10px;
   background: #ffffff;
@@ -702,6 +702,11 @@
 .shape-style-toolbar * {
   user-select: none;
   -webkit-user-select: none;
+}
+
+.shape-style-toolbar.is-blank-hover,
+.shape-style-toolbar.is-dragging {
+  cursor: all-scroll;
 }
 
 .shape-style-toolbar__group {
@@ -764,7 +769,8 @@
   font-size: 0.78rem;
   font-weight: 700;
   height: 30px;
-  padding: 0 10px;
+  min-width: 62px;
+  padding: 0 12px;
   cursor: pointer;
 }
 
@@ -776,14 +782,15 @@
   font-size: 0.78rem;
   font-weight: 700;
   height: 30px;
-  padding: 0 10px;
+  min-width: 62px;
+  padding: 0 12px;
   cursor: pointer;
 }
 
 .shape-style-toolbar__connect.is-active {
-  border-color: #8ab4f8;
-  background: #dfefff;
-  color: #15406d;
+  border-color: #b9c1c8;
+  background: #e5e8eb;
+  color: #5f6770;
 }
 
 .shape-style-toolbar__connect:disabled {

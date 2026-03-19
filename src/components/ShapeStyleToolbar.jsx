@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react'
+
 function ShapeStyleToolbar({
   position,
   styleValues,
@@ -9,16 +11,94 @@ function ShapeStyleToolbar({
   onConnectSelected,
   canConnectSelected,
   isConnectMode,
+  onToolbarOffsetDelta,
   onApplyPreset,
   onDeleteSelected,
 }) {
+  const dragRef = useRef({ isDragging: false, pointerId: null, lastClientX: 0, lastClientY: 0 })
+  const [isHoveringBlankArea, setIsHoveringBlankArea] = useState(false)
+  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false)
+
+  const isInteractiveTarget = (target) => {
+    if (!(target instanceof Element)) {
+      return false
+    }
+
+    return Boolean(target.closest('button, input, select, textarea, label'))
+  }
+
   if (!position) {
     return null
   }
 
+  const handleToolbarPointerDown = (event) => {
+    if (event.button !== 0 || isInteractiveTarget(event.target)) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    dragRef.current = {
+      isDragging: true,
+      pointerId: event.pointerId,
+      lastClientX: event.clientX,
+      lastClientY: event.clientY,
+    }
+    setIsDraggingToolbar(true)
+    setIsHoveringBlankArea(true)
+  }
+
+  const handleToolbarPointerMove = (event) => {
+    const dragState = dragRef.current
+    if (dragState.isDragging && dragState.pointerId === event.pointerId) {
+      event.preventDefault()
+      event.stopPropagation()
+      const deltaX = event.clientX - dragState.lastClientX
+      const deltaY = event.clientY - dragState.lastClientY
+
+      if ((deltaX !== 0 || deltaY !== 0) && typeof onToolbarOffsetDelta === 'function') {
+        onToolbarOffsetDelta({ deltaX, deltaY })
+      }
+
+      dragRef.current = {
+        ...dragState,
+        lastClientX: event.clientX,
+        lastClientY: event.clientY,
+      }
+      return
+    }
+
+    setIsHoveringBlankArea(!isInteractiveTarget(event.target))
+  }
+
+  const handleToolbarPointerLeave = () => {
+    if (!dragRef.current.isDragging) {
+      setIsHoveringBlankArea(false)
+    }
+  }
+
+  const handleToolbarPointerEnd = (event) => {
+    const dragState = dragRef.current
+    if (!dragState.isDragging || dragState.pointerId !== event.pointerId) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+
+    dragRef.current = { isDragging: false, pointerId: null, lastClientX: 0, lastClientY: 0 }
+    setIsDraggingToolbar(false)
+    setIsHoveringBlankArea(false)
+  }
+
   return (
     <div
-      className="shape-style-toolbar"
+      className={`shape-style-toolbar ${isHoveringBlankArea ? 'is-blank-hover' : ''} ${isDraggingToolbar ? 'is-dragging' : ''}`}
       style={{
         left: `${position.left}px`,
         top: `${position.top}px`,
@@ -26,6 +106,11 @@ function ShapeStyleToolbar({
       }}
       onPointerDownCapture={(event) => event.stopPropagation()}
       onMouseDownCapture={(event) => event.stopPropagation()}
+      onPointerDown={handleToolbarPointerDown}
+      onPointerMove={handleToolbarPointerMove}
+      onPointerLeave={handleToolbarPointerLeave}
+      onPointerUp={handleToolbarPointerEnd}
+      onPointerCancel={handleToolbarPointerEnd}
       onDragStart={(event) => event.preventDefault()}
     >
       <select
@@ -101,7 +186,7 @@ function ShapeStyleToolbar({
         disabled={!canConnectSelected}
         aria-label="连接选中图形"
       >
-        {isConnectMode ? '连接中' : '连接'}
+        连接
       </button>
 
       <button
