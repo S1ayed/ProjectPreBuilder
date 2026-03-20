@@ -105,8 +105,7 @@ export const findTopShapeAtPoint = (point, shapeList) => {
 }
 
 export const getConnectionPairKey = (fromShapeId, toShapeId) => {
-  const orderedIds = [fromShapeId, toShapeId].sort()
-  return `${orderedIds[0]}::${orderedIds[1]}`
+  return `${fromShapeId}->${toShapeId}`
 }
 
 export const getConnectorAnchorWorld = (shape, targetPoint) => {

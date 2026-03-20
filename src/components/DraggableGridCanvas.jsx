@@ -36,6 +36,7 @@ function DraggableGridCanvas({
   activeTool,
   showRuler,
   showAlignmentGuides,
+  onConnectionsChange,
 }) {
   const viewportRef = useRef(null)
   const [isDropTarget, setIsDropTarget] = useState(false)
@@ -146,6 +147,8 @@ function DraggableGridCanvas({
 
     handlePointerCancel(event)
   }
+
+  const connectionArrowMarkerId = 'grid-workspace-connection-arrowhead'
 
   useEffect(() => {
     if (!viewportRef.current) {
@@ -320,6 +323,14 @@ function DraggableGridCanvas({
     viewportSize,
   })
 
+  useEffect(() => {
+    if (typeof onConnectionsChange !== 'function') {
+      return
+    }
+
+    onConnectionsChange(validShapeConnections)
+  }, [onConnectionsChange, validShapeConnections])
+
   return (
     <section className="grid-workspace" aria-label="绘图工作区">
       <div
@@ -426,16 +437,33 @@ function DraggableGridCanvas({
 
         {connectorSegments.length > 0 && (
           <svg className="grid-workspace__connection-layer" aria-hidden="true">
+            <defs>
+              <marker
+                id={connectionArrowMarkerId}
+                viewBox="0 0 10 10"
+                refX="8.5"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill={CONNECTOR_STROKE_COLOR} />
+              </marker>
+            </defs>
             {connectorSegments.map((segment) => (
               <line
                 key={segment.id}
                 className="grid-workspace__connection-line"
+                data-from-shape-id={segment.fromShapeId}
+                data-to-shape-id={segment.toShapeId}
                 x1={segment.start.x}
                 y1={segment.start.y}
                 x2={segment.end.x}
                 y2={segment.end.y}
                 stroke={CONNECTOR_STROKE_COLOR}
                 strokeWidth={CONNECTOR_STROKE_WIDTH}
+                markerEnd={`url(#${connectionArrowMarkerId})`}
               />
             ))}
           </svg>

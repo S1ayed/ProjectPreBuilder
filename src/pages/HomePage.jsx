@@ -65,6 +65,7 @@ function HomePage() {
   const [activeTool, setActiveTool] = useState('select')
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 })
   const [canvasShapes, setCanvasShapes] = useState([])
+  const [, setCanvasConnections] = useState([])
   const [workspaceAssist, setWorkspaceAssist] = useState({
     showRuler: false,
     showAlignmentGuides: false,
@@ -267,6 +268,7 @@ function HomePage() {
             shapes={canvasShapes}
             onAddShape={handleAddShape}
             onShapesChange={setCanvasShapes}
+            onConnectionsChange={setCanvasConnections}
             activeTool={activeTool}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}

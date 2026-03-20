@@ -130,6 +130,8 @@ export function useShapeConnections({
 
     return {
       id: connection.id,
+      fromShapeId: connection.fromShapeId,
+      toShapeId: connection.toShapeId,
       start: worldToScreenPoint(startWorld, viewport),
       end: worldToScreenPoint(endWorld, viewport),
     }
