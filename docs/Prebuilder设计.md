@@ -191,6 +191,41 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 }
 ```
 
+### 4.6 kind: `rule`
+
+- 语义：规则节点，用于约束 LLM 在构建当前 Project 时的行为边界。
+- 作用：定义必须遵守（hard）或建议遵守（soft）的用户规则。
+- 作用域判定：由 Rule 节点连接到的对象决定。
+  - 连接到 `project` 节点：`scope = global`
+  - 连接到 `directory` 节点：`scope = directory`
+  - 连接到 `file` 节点：`scope = file`
+
+建议结构(以下仅为示例)：
+
+```jsonc
+{
+  "id": "rule_1",
+  "type": "rule",
+  "enabled": true,
+  "scope": "global | directory | file",
+  "rule_condition": "hard | soft",
+  "content": "禁止在未授权情况下引入第三方库",
+  "examples": [
+    "正例：在新增第三方依赖前先通知用户并获得授权。",
+    "反例：未告知用户直接安装并使用第三方库。"
+  ]
+}
+```
+
+字段说明：
+
+- `enabled`：是否启用规则。
+- `rule_condition`：
+  - `hard`：规则绝对不能被违反。
+  - `soft`：若发生违反规则情况，通知用户并询问是否禁止该行为。
+- `content`：规则内容文本。
+- `examples`：一到两个正反例，用于减少 LLM 对规则的误解。
+
 ## 5. 依赖连线（DependencyConnecting）规范
 
 推荐结构：
