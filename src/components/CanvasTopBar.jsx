@@ -1,4 +1,4 @@
-function CanvasTopBar({ zoom, onZoomIn, onZoomOut, onResetView }) {
+function CanvasTopBar({ zoom, onZoomIn, onZoomOut, onResetView, onExport }) {
   return (
     <header className="canvas-topbar">
       <div className="canvas-topbar__left">
@@ -21,7 +21,7 @@ function CanvasTopBar({ zoom, onZoomIn, onZoomOut, onResetView }) {
       </div>
 
       <div className="canvas-topbar__right">
-        <button type="button" className="canvas-topbar__btn canvas-topbar__btn--accent">导出</button>
+        <button type="button" className="canvas-topbar__btn canvas-topbar__btn--accent" onClick={onExport}>导出</button>
       </div>
     </header>
   )

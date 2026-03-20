@@ -218,6 +218,22 @@
   gap: 10px;
 }
 
+.workbench-sidebar__favorites--relations {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workbench-sidebar__library-group {
+  margin-top: 12px;
+}
+
+.workbench-sidebar__library-group-title {
+  margin: 0;
+  color: #4f6156;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .workbench-sidebar__shape-card {
   border: 1px solid #d7ddda;
   border-radius: 8px;
@@ -232,9 +248,20 @@
   cursor: grabbing;
 }
 
+.workbench-sidebar__shape-card.is-connection-tool,
+.workbench-sidebar__shape-card.is-connection-tool:active {
+  cursor: default;
+}
+
 .workbench-sidebar__shape-card.is-disabled {
   cursor: not-allowed;
   opacity: 0.62;
+}
+
+.workbench-sidebar__shape-card.is-active-tool {
+  border-color: #6e94d6;
+  box-shadow: 0 0 0 2px rgba(110, 148, 214, 0.2);
+  background: #eef4ff;
 }
 
 .workbench-sidebar__shape-card.is-add {
@@ -532,6 +559,10 @@
 
 .grid-workspace__connection-line {
   stroke-linecap: round;
+}
+
+.grid-workspace__connection-line--directional {
+  stroke: #345f95;
 }
 
 .grid-workspace__guide-line {

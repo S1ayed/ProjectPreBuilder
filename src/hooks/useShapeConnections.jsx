@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   findTopShapeAtPoint,
   getConnectionPairKey,
@@ -12,15 +12,21 @@ export function useShapeConnections({
   selectedShapeIds,
   isPenTool,
   viewport,
+  connectionToolMode,
+  onDirectionalConnectionComplete,
 }) {
   const connectionIdRef = useRef(0)
   const [shapeConnections, setShapeConnections] = useState([])
   const [connectionSourceShapeId, setConnectionSourceShapeId] = useState(null)
+  const [toolConnectionSourceShapeId, setToolConnectionSourceShapeId] = useState(null)
+
+  const isDirectionalConnectionToolActive = connectionToolMode === 'depends_on' && !isPenTool
 
   const availableShapeIdSet = new Set(shapes.map((shape) => shape.id))
   const activeConnectionSourceShapeId = (
     connectionSourceShapeId
     && !isPenTool
+    && !isDirectionalConnectionToolActive
     && selectedShapeIds.length === 1
     && selectedShapeIds[0] === connectionSourceShapeId
     && availableShapeIdSet.has(connectionSourceShapeId)
@@ -28,21 +34,64 @@ export function useShapeConnections({
     ? connectionSourceShapeId
     : null
 
-  const isConnecting = Boolean(activeConnectionSourceShapeId)
-  const canToggleConnectionMode = isConnecting || selectedShapeIds.length === 1
+  const isConnecting = Boolean(activeConnectionSourceShapeId) || isDirectionalConnectionToolActive
+  const canToggleConnectionMode = !isDirectionalConnectionToolActive && (
+    Boolean(activeConnectionSourceShapeId) || selectedShapeIds.length === 1
+  )
 
-  const createConnectionBetweenShapes = useCallback((fromShapeId, toShapeId) => {
+  useEffect(() => {
+    if (!isDirectionalConnectionToolActive && toolConnectionSourceShapeId !== null) {
+      setToolConnectionSourceShapeId(null)
+    }
+  }, [isDirectionalConnectionToolActive, toolConnectionSourceShapeId])
+
+  useEffect(() => {
+    if (isDirectionalConnectionToolActive && connectionSourceShapeId !== null) {
+      setConnectionSourceShapeId(null)
+    }
+  }, [isDirectionalConnectionToolActive, connectionSourceShapeId])
+
+  useEffect(() => {
+    if (toolConnectionSourceShapeId && !availableShapeIdSet.has(toolConnectionSourceShapeId)) {
+      setToolConnectionSourceShapeId(null)
+    }
+  }, [toolConnectionSourceShapeId, availableShapeIdSet])
+
+  const getConnectionUniqueKey = (connection) => {
+    const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
+    const dependencyType = relationKind === 'depends_on'
+      ? (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
+        ? connection.dependencyType.trim()
+        : 'depends_on')
+      : ''
+
+    return `${relationKind}|${getConnectionPairKey(connection.fromShapeId, connection.toShapeId)}|${dependencyType}`
+  }
+
+  const createConnectionBetweenShapes = useCallback((fromShapeId, toShapeId, options = {}) => {
     if (!fromShapeId || !toShapeId || fromShapeId === toShapeId) {
       return false
     }
 
-    const nextPairKey = getConnectionPairKey(fromShapeId, toShapeId)
+    const relationKind = options.relationKind === 'depends_on' ? 'depends_on' : 'contains'
+    const dependencyType = relationKind === 'depends_on'
+      ? (typeof options.dependencyType === 'string' && options.dependencyType.trim()
+        ? options.dependencyType.trim()
+        : 'depends_on')
+      : null
+
+    const nextConnectionKey = getConnectionUniqueKey({
+      fromShapeId,
+      toShapeId,
+      relationKind,
+      dependencyType,
+    })
     const currentShapeIdSet = new Set(shapes.map((shape) => shape.id))
     const validConnections = shapeConnections.filter((connection) => (
       currentShapeIdSet.has(connection.fromShapeId) && currentShapeIdSet.has(connection.toShapeId)
     ))
     const hasConnection = validConnections.some((connection) => (
-      getConnectionPairKey(connection.fromShapeId, connection.toShapeId) === nextPairKey
+      getConnectionUniqueKey(connection) === nextConnectionKey
     ))
 
     if (hasConnection) {
@@ -56,6 +105,8 @@ export function useShapeConnections({
       id: `connection-${connectionIdRef.current}`,
       fromShapeId,
       toShapeId,
+      relationKind,
+      dependencyType,
     }
     connectionIdRef.current += 1
     setShapeConnections([...validConnections, nextConnection])
@@ -63,7 +114,42 @@ export function useShapeConnections({
   }, [shapes, shapeConnections])
 
   const tryHandleConnectionPointerDown = useCallback((event) => {
-    if (!isConnecting || event.button !== 0) {
+    if (event.button !== 0) {
+      return false
+    }
+
+    if (isDirectionalConnectionToolActive) {
+      const worldPoint = getWorldPoint(event, event.currentTarget, viewport)
+      const hitShape = findTopShapeAtPoint(worldPoint, shapes)
+
+      event.preventDefault()
+      if (!hitShape) {
+        setToolConnectionSourceShapeId(null)
+        return true
+      }
+
+      if (!toolConnectionSourceShapeId) {
+        setToolConnectionSourceShapeId(hitShape.id)
+        return true
+      }
+
+      if (hitShape.id === toolConnectionSourceShapeId) {
+        setToolConnectionSourceShapeId(null)
+        return true
+      }
+
+      createConnectionBetweenShapes(toolConnectionSourceShapeId, hitShape.id, {
+        relationKind: 'depends_on',
+        dependencyType: 'depends_on',
+      })
+      setToolConnectionSourceShapeId(null)
+      if (typeof onDirectionalConnectionComplete === 'function') {
+        onDirectionalConnectionComplete()
+      }
+      return true
+    }
+
+    if (!activeConnectionSourceShapeId) {
       return false
     }
 
@@ -86,9 +172,21 @@ export function useShapeConnections({
     }
 
     return true
-  }, [isConnecting, viewport, shapes, activeConnectionSourceShapeId, createConnectionBetweenShapes])
+  }, [
+    isDirectionalConnectionToolActive,
+    viewport,
+    shapes,
+    toolConnectionSourceShapeId,
+    createConnectionBetweenShapes,
+    onDirectionalConnectionComplete,
+    activeConnectionSourceShapeId,
+  ])
 
   const toggleConnectionMode = useCallback(() => {
+    if (isDirectionalConnectionToolActive) {
+      return
+    }
+
     if (selectedShapeIds.length !== 1) {
       return
     }
@@ -97,7 +195,7 @@ export function useShapeConnections({
     setConnectionSourceShapeId((previousSourceShapeId) => (
       previousSourceShapeId === nextSourceShapeId ? null : nextSourceShapeId
     ))
-  }, [selectedShapeIds])
+  }, [selectedShapeIds, isDirectionalConnectionToolActive])
 
   const removeConnectionsByShapeIds = useCallback((shapeIds) => {
     if (!shapeIds || shapeIds.length === 0) {
@@ -113,7 +211,18 @@ export function useShapeConnections({
   const shapeById = new Map(shapes.map((shape) => [shape.id, shape]))
   const validShapeConnections = shapeConnections.filter((connection) => (
     shapeById.has(connection.fromShapeId) && shapeById.has(connection.toShapeId)
-  ))
+  )).map((connection) => {
+    const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
+    return {
+      ...connection,
+      relationKind,
+      dependencyType: relationKind === 'depends_on'
+        ? (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
+          ? connection.dependencyType.trim()
+          : 'depends_on')
+        : null,
+    }
+  })
 
   const connectorSegments = validShapeConnections.map((connection) => {
     const fromShape = shapeById.get(connection.fromShapeId)
@@ -132,6 +241,8 @@ export function useShapeConnections({
       id: connection.id,
       fromShapeId: connection.fromShapeId,
       toShapeId: connection.toShapeId,
+      relationKind: connection.relationKind,
+      dependencyType: connection.dependencyType,
       start: worldToScreenPoint(startWorld, viewport),
       end: worldToScreenPoint(endWorld, viewport),
     }
@@ -139,6 +250,7 @@ export function useShapeConnections({
 
   return {
     isConnecting,
+    isDirectionalConnectionToolActive,
     canToggleConnectionMode,
     toggleConnectionMode,
     tryHandleConnectionPointerDown,

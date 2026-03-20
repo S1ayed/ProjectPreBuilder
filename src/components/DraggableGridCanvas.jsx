@@ -33,6 +33,8 @@ import {
   worldToScreenPoint,
 } from './canvas/canvasUtils'
 
+const DIRECTIONAL_CONNECTION_MARKER_ID = 'grid-workspace-connection-arrow'
+
 function DraggableGridCanvas({
   viewport,
   onViewportChange,
@@ -44,8 +46,11 @@ function DraggableGridCanvas({
   showAlignmentGuides,
   onConnectionsChange,
   onEditSelectedNode,
+  connectionToolMode,
+  onConnectionToolModeComplete,
 }) {
   const viewportRef = useRef(null)
+  const lastEmittedConnectionsRef = useRef('')
 
   const isPenTool = activeTool === 'pen'
   const viewportSize = useViewportSize(viewportRef)
@@ -110,11 +115,14 @@ function DraggableGridCanvas({
     removeConnectionsByShapeIds,
     validShapeConnections,
     connectorSegments,
+    isDirectionalConnectionToolActive,
   } = useShapeConnections({
     shapes,
     selectedShapeIds,
     isPenTool,
     viewport,
+    connectionToolMode,
+    onDirectionalConnectionComplete: onConnectionToolModeComplete,
   })
 
   const {
@@ -293,6 +301,12 @@ function DraggableGridCanvas({
       return
     }
 
+    const nextSnapshot = JSON.stringify(validShapeConnections)
+    if (lastEmittedConnectionsRef.current === nextSnapshot) {
+      return
+    }
+
+    lastEmittedConnectionsRef.current = nextSnapshot
     onConnectionsChange(validShapeConnections)
   }, [onConnectionsChange, validShapeConnections])
 
@@ -385,18 +399,34 @@ function DraggableGridCanvas({
 
         {connectorSegments.length > 0 && (
           <svg className="grid-workspace__connection-layer" aria-hidden="true">
+            <defs>
+              <marker
+                id={DIRECTIONAL_CONNECTION_MARKER_ID}
+                markerWidth="10"
+                markerHeight="10"
+                refX="8"
+                refY="5"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L10,5 L0,10 z" fill={CONNECTOR_STROKE_COLOR} />
+              </marker>
+            </defs>
             {connectorSegments.map((segment) => (
               <line
                 key={segment.id}
-                className="grid-workspace__connection-line"
+                className={`grid-workspace__connection-line ${segment.relationKind === 'depends_on' ? 'grid-workspace__connection-line--directional' : ''}`}
                 data-from-shape-id={segment.fromShapeId}
                 data-to-shape-id={segment.toShapeId}
+                data-relation-kind={segment.relationKind}
+                data-dependency-type={segment.dependencyType || ''}
                 x1={segment.start.x}
                 y1={segment.start.y}
                 x2={segment.end.x}
                 y2={segment.end.y}
                 stroke={CONNECTOR_STROKE_COLOR}
                 strokeWidth={CONNECTOR_STROKE_WIDTH}
+                markerEnd={segment.relationKind === 'depends_on' ? `url(#${DIRECTIONAL_CONNECTION_MARKER_ID})` : undefined}
               />
             ))}
           </svg>
@@ -483,6 +513,7 @@ function DraggableGridCanvas({
       <div className="grid-workspace__status">
         <span>Shapes: {shapes.length}</span>
         <span>Connections: {validShapeConnections.length}</span>
+        <span>ArrowLine: {isDirectionalConnectionToolActive ? 'On' : 'Off'}</span>
         <span>Connect Mode: {isConnecting ? 'On' : 'Off'}</span>
         <span>Selected: {selectedShapeIds.length}</span>
         <span>Offset X: {Math.round(viewport.x)}</span>

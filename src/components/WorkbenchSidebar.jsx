@@ -31,6 +31,8 @@ function WorkbenchSidebar({
   layers,
   workspaceAssist,
   onToggleWorkspaceAssist,
+  activeConnectionTool,
+  onSelectConnectionTool,
 }) {
   const [activeSection, setActiveSection] = useState('template')
   const ActiveSectionComponent = sectionComponentMap[activeSection] || TemplateSection
@@ -65,6 +67,8 @@ function WorkbenchSidebar({
           layers={layers}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={onToggleWorkspaceAssist}
+          activeConnectionTool={activeConnectionTool}
+          onSelectConnectionTool={onSelectConnectionTool}
         />
       </div>
     </aside>

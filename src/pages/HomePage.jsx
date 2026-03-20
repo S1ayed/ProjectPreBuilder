@@ -34,7 +34,8 @@ function HomePage() {
   const [activeTool, setActiveTool] = useState('select')
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 })
   const [canvasShapes, setCanvasShapes] = useState([])
-  const [, setCanvasConnections] = useState([])
+  const [canvasConnections, setCanvasConnections] = useState([])
+  const [connectionToolMode, setConnectionToolMode] = useState(null)
   const [editingNodeId, setEditingNodeId] = useState(null)
   const [workspaceAssist, setWorkspaceAssist] = useState({
     showRuler: false,
@@ -223,6 +224,93 @@ function HomePage() {
     setEditingNodeId(null)
   }
 
+  const handleSelectConnectionTool = (nextMode) => {
+    if (!nextMode) {
+      return
+    }
+
+    setConnectionToolMode((previousMode) => (previousMode === nextMode ? null : nextMode))
+    setActiveTool('select')
+  }
+
+  const handleConnectionToolModeComplete = () => {
+    setConnectionToolMode(null)
+  }
+
+  const handleExportModel = () => {
+    const nodes = canvasShapes.map((shape) => {
+      const kind = getKindByShapeType(shape.type)
+      return {
+        id: shape.id,
+        kind,
+        type: shape.type,
+        payload: normalizeNodePayload(kind, shape.payload),
+        geometry: {
+          x: shape.x,
+          y: shape.y,
+          width: shape.width,
+          height: shape.height,
+        },
+        style: {
+          fillColor: shape.fillColor,
+          strokeColor: shape.strokeColor,
+          strokeWidth: shape.strokeWidth,
+          opacity: shape.opacity,
+        },
+      }
+    })
+
+    const relations = canvasConnections.map((connection) => {
+      const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
+      const dependencyType = relationKind === 'depends_on'
+        ? (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
+          ? connection.dependencyType.trim()
+          : 'depends_on')
+        : null
+
+      return {
+        id: connection.id,
+        relationKind,
+        from: connection.fromShapeId,
+        to: connection.toShapeId,
+        dependencyType,
+      }
+    })
+
+    const structureRelations = relations.filter((relation) => relation.relationKind === 'contains')
+    const dependencies = relations
+      .filter((relation) => relation.relationKind === 'depends_on')
+      .map((relation) => ({
+        id: relation.id,
+        from: relation.from,
+        to: relation.to,
+        type: relation.dependencyType || 'depends_on',
+      }))
+
+    const model = {
+      nodes,
+      structureRelations,
+      dependencies,
+      relations,
+      meta: {
+        version: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        source: 'ProjectPreBuilder',
+      },
+    }
+
+    const fileContent = `${JSON.stringify(model, null, 2)}\n`
+    const blob = new Blob([fileContent], { type: 'application/json;charset=utf-8' })
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = 'prebuilder-model.json'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(objectUrl)
+  }
+
   return (
     <div className={homeClassName}>
       <div className="home-page__gradient" aria-hidden="true" />
@@ -234,6 +322,8 @@ function HomePage() {
           layers={layerItems}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={handleToggleWorkspaceAssist}
+          activeConnectionTool={connectionToolMode}
+          onSelectConnectionTool={handleSelectConnectionTool}
         />
 
         {!isCompactLayout && (
@@ -260,6 +350,7 @@ function HomePage() {
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetView={handleResetView}
+            onExport={handleExportModel}
           />
           <DraggableGridCanvas
             viewport={viewport}
@@ -269,6 +360,8 @@ function HomePage() {
             onShapesChange={setCanvasShapes}
             onConnectionsChange={setCanvasConnections}
             onEditSelectedNode={handleEditSelectedNode}
+            connectionToolMode={connectionToolMode}
+            onConnectionToolModeComplete={handleConnectionToolModeComplete}
             activeTool={activeTool}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}
