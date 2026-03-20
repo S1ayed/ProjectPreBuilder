@@ -208,6 +208,7 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 
 - 连线为有向边，`from -> to`。
 - 在解释器中可用于构建依赖图，支持后续排序、校验和生成。
+- type是可选的，包含import、depends_on、generates、contains等关系
 
 ## 6. 初始化约束
 
