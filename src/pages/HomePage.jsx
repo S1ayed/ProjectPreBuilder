@@ -4,6 +4,12 @@ import CanvasTopBar from '../components/CanvasTopBar'
 import DraggableGridCanvas from '../components/DraggableGridCanvas'
 import { layerItems } from '../constants/layerItems'
 import { toolItems } from '../constants/toolItems'
+import {
+  getNormalizedViewport,
+  getResetViewport,
+  getZoomInViewport,
+  getZoomOutViewport,
+} from '../movements/zooming'
 import './HomePage.css'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -98,25 +104,19 @@ function HomePage() {
   }, [])
 
   const updateViewport = (nextViewport) => {
-    setViewport({
-      x: nextViewport.x,
-      y: nextViewport.y,
-      zoom: clamp(nextViewport.zoom, 0.45, 2.2),
-    })
+    setViewport(getNormalizedViewport(nextViewport))
   }
 
-  const zoomStep = 0.12
-
   const handleZoomIn = () => {
-    updateViewport({ ...viewport, zoom: viewport.zoom + zoomStep })
+    setViewport((previous) => getZoomInViewport(previous))
   }
 
   const handleZoomOut = () => {
-    updateViewport({ ...viewport, zoom: viewport.zoom - zoomStep })
+    setViewport((previous) => getZoomOutViewport(previous))
   }
 
   const handleResetView = () => {
-    updateViewport({ x: 0, y: 0, zoom: 1 })
+    setViewport(getResetViewport())
   }
 
   const handleAddShape = (shapeType, position) => {
