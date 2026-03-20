@@ -10,6 +10,7 @@ import {
   getShapeTypeByKind,
   normalizeNodePayload,
 } from '../constants/nodeKinds'
+import { getShapeDefaultSize, getShapeDefaultStyle } from '../constants/shapeConfigs'
 import { toolItems } from '../constants/toolItems'
 import {
   getNormalizedViewport,
@@ -27,45 +28,6 @@ const getSidebarBounds = (viewportWidth) => {
   const min = viewportWidth > 1200 ? 360 : 300
   const max = Math.min(620, Math.max(360, Math.round(viewportWidth * 0.56)))
   return { min, max }
-}
-
-const getDefaultShapeSize = (shapeType) => {
-  if (shapeType === 'oval') {
-    return { width: 128, height: 88 }
-  }
-
-  if (shapeType === 'diamond') {
-    return { width: 108, height: 108 }
-  }
-
-  return { width: 120, height: 86 }
-}
-
-const getDefaultShapeStyle = (shapeType) => {
-  if (shapeType === 'diamond') {
-    return {
-      fillColor: '#ffe59a',
-      strokeColor: '#8a6b1f',
-      strokeWidth: 2,
-      opacity: 1,
-    }
-  }
-
-  if (shapeType === 'oval') {
-    return {
-      fillColor: '#cde8ff',
-      strokeColor: '#2f5b8a',
-      strokeWidth: 2,
-      opacity: 1,
-    }
-  }
-
-  return {
-    fillColor: '#dbe6ff',
-    strokeColor: '#51618f',
-    strokeWidth: 2,
-    opacity: 1,
-  }
 }
 
 function HomePage() {
@@ -133,8 +95,8 @@ function HomePage() {
       return
     }
 
-    const shapeSize = getDefaultShapeSize(shapeType)
-    const shapeStyle = getDefaultShapeStyle(shapeType)
+    const shapeSize = getShapeDefaultSize(shapeType)
+    const shapeStyle = getShapeDefaultStyle(shapeType)
     const kind = getKindByShapeType(shapeType)
     const payload = getDefaultNodePayload(kind)
 

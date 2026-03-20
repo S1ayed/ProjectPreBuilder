@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import ShapeStyleToolbar from './ShapeStyleToolbar'
 import { useCanvasMouseActions } from '../movements/canvasMouseActions'
-import { CONNECTION_ARROW_MARKER_ID } from '../constants/canvasViewConstants'
 import { usePenStrokes } from '../hooks/usePenStrokes'
 import { useCanvasDropTarget } from '../hooks/useCanvasDropTarget'
 import { useShapeConnections } from '../hooks/useShapeConnections'
@@ -11,6 +10,7 @@ import {
   DEFAULT_FILE_NAME,
   getKindByShapeType,
 } from '../constants/nodeKinds'
+import { isShapeResizable } from '../constants/shapeConfigs'
 import { getShapeStylePresetPatch } from '../constants/shapeStylePresets'
 import { ZOOM_STEP } from '../movements/zooming'
 import {
@@ -385,20 +385,6 @@ function DraggableGridCanvas({
 
         {connectorSegments.length > 0 && (
           <svg className="grid-workspace__connection-layer" aria-hidden="true">
-            <defs>
-              <marker
-                id={CONNECTION_ARROW_MARKER_ID}
-                viewBox="0 0 10 10"
-                refX="8.5"
-                refY="5"
-                markerWidth="7"
-                markerHeight="7"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill={CONNECTOR_STROKE_COLOR} />
-              </marker>
-            </defs>
             {connectorSegments.map((segment) => (
               <line
                 key={segment.id}
@@ -411,7 +397,6 @@ function DraggableGridCanvas({
                 y2={segment.end.y}
                 stroke={CONNECTOR_STROKE_COLOR}
                 strokeWidth={CONNECTOR_STROKE_WIDTH}
-                markerEnd={`url(#${CONNECTION_ARROW_MARKER_ID})`}
               />
             ))}
           </svg>
@@ -426,6 +411,7 @@ function DraggableGridCanvas({
             const shapeKind = getKindByShapeType(shape.type)
             const shapeFileName = typeof shape?.payload?.FileName === 'string' ? shape.payload.FileName.trim() : ''
             const showFileNameLabel = shapeKind === 'file' && shapeFileName && shapeFileName !== DEFAULT_FILE_NAME
+            const canResizeShape = isShapeResizable(shape.type)
             return (
               <div
                 key={`shape-body-${shape.id}`}
@@ -449,7 +435,7 @@ function DraggableGridCanvas({
 
                 {showFileNameLabel && <span className="canvas-shape__name">{shapeFileName}</span>}
 
-                {isSelected && (
+                {isSelected && canResizeShape && (
                   <button
                     type="button"
                     className="canvas-shape__resize-handle"

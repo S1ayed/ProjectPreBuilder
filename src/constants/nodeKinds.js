@@ -9,13 +9,14 @@ export const DEFAULT_FILE_NAME = 'new-file.js'
 
 const SHAPE_KIND_MAP = {
   diamond: 'project',
+  parallelogram: 'directory',
   rect: 'file',
   oval: 'config',
 }
 
 const KIND_SHAPE_MAP = {
   project: 'diamond',
-  directory: 'rect',
+  directory: 'parallelogram',
   file: 'rect',
   config: 'oval',
 }
