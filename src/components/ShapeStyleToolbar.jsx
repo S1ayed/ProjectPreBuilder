@@ -13,6 +13,8 @@ function ShapeStyleToolbar({
   isConnectMode,
   onToolbarOffsetDelta,
   onApplyPreset,
+  onEditSelected,
+  canEditSelected,
   onDeleteSelected,
 }) {
   const dragRef = useRef({ isDragging: false, lastClientX: 0, lastClientY: 0 })
@@ -210,6 +212,16 @@ function ShapeStyleToolbar({
         aria-label="连接选中图形"
       >
         连接
+      </button>
+
+      <button
+        type="button"
+        className="shape-style-toolbar__edit"
+        onClick={onEditSelected}
+        disabled={!canEditSelected}
+        aria-label="编辑当前节点"
+      >
+        编辑
       </button>
 
       <button

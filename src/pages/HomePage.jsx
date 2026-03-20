@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import WorkbenchSidebar from '../components/WorkbenchSidebar'
 import CanvasTopBar from '../components/CanvasTopBar'
 import DraggableGridCanvas from '../components/DraggableGridCanvas'
+import NodePropertyPanel from '../components/NodePropertyPanel'
 import { layerItems } from '../constants/layerItems'
+import {
+  getDefaultNodePayload,
+  getKindByShapeType,
+  getShapeTypeByKind,
+  normalizeNodePayload,
+} from '../constants/nodeKinds'
 import { toolItems } from '../constants/toolItems'
 import {
   getNormalizedViewport,
@@ -66,6 +73,7 @@ function HomePage() {
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 })
   const [canvasShapes, setCanvasShapes] = useState([])
   const [, setCanvasConnections] = useState([])
+  const [editingNodeId, setEditingNodeId] = useState(null)
   const [workspaceAssist, setWorkspaceAssist] = useState({
     showRuler: false,
     showAlignmentGuides: false,
@@ -127,10 +135,14 @@ function HomePage() {
 
     const shapeSize = getDefaultShapeSize(shapeType)
     const shapeStyle = getDefaultShapeStyle(shapeType)
+    const kind = getKindByShapeType(shapeType)
+    const payload = getDefaultNodePayload(kind)
 
     const nextShape = {
       id: `shape-${shapeIdRef.current}`,
       type: shapeType,
+      kind,
+      payload,
       x: position.x,
       y: position.y,
       width: shapeSize.width,
@@ -223,6 +235,31 @@ function HomePage() {
   const shellClassName = `home-page__shell ${isCompactLayout ? 'home-page__shell--compact' : ''}`
   const shellStyle = isCompactLayout ? undefined : { '--sidebar-width': `${sidebarWidth}px` }
   const homeClassName = `home-page ${isResizing ? 'is-resizing' : ''}`
+  const editingNode = canvasShapes.find((shape) => shape.id === editingNodeId) || null
+
+  const handleEditSelectedNode = (shapeId) => {
+    if (!shapeId) {
+      return
+    }
+
+    setEditingNodeId(shapeId)
+  }
+
+  const handleSaveNodeProperties = ({ id, kind, payload }) => {
+    setCanvasShapes((previousShapes) => previousShapes.map((shape) => {
+      if (shape.id !== id) {
+        return shape
+      }
+
+      return {
+        ...shape,
+        type: getShapeTypeByKind(kind),
+        kind,
+        payload: normalizeNodePayload(kind, payload),
+      }
+    }))
+    setEditingNodeId(null)
+  }
 
   return (
     <div className={homeClassName}>
@@ -269,12 +306,22 @@ function HomePage() {
             onAddShape={handleAddShape}
             onShapesChange={setCanvasShapes}
             onConnectionsChange={setCanvasConnections}
+            onEditSelectedNode={handleEditSelectedNode}
             activeTool={activeTool}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}
           />
         </main>
       </div>
+
+      {editingNode && (
+        <NodePropertyPanel
+          key={editingNode.id}
+          node={editingNode}
+          onClose={() => setEditingNodeId(null)}
+          onSave={handleSaveNodeProperties}
+        />
+      )}
     </div>
   )
 }

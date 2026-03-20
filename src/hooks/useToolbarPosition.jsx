@@ -48,7 +48,7 @@ export function useToolbarPosition({
     return {
       left: clamp(rawLeft, 12, Math.max(12, viewportSize.width - 12)),
       top: clamp(rawTop, 18, Math.max(18, viewportSize.height - 18)),
-      maxWidth: 640,
+      maxWidth: 780,
     }
   }, [showSelectionToolbar, selectedBoundsWorld, toolbarAnchorWorld, viewport, viewportSize, toolbarScreenPosition, selectionKey])
 
