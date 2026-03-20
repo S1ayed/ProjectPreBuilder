@@ -1,16 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import ShapeStyleToolbar from './ShapeStyleToolbar'
 import { useCanvasMouseActions } from '../movements/canvasMouseActions'
+import { CONNECTION_ARROW_MARKER_ID } from '../constants/canvasViewConstants'
 import { usePenStrokes } from '../hooks/usePenStrokes'
+import { useCanvasDropTarget } from '../hooks/useCanvasDropTarget'
 import { useShapeConnections } from '../hooks/useShapeConnections'
 import { useToolbarPosition } from '../hooks/useToolbarPosition'
+import { useViewportSize } from '../hooks/useViewportSize'
+import {
+  DEFAULT_FILE_NAME,
+  getKindByShapeType,
+} from '../constants/nodeKinds'
+import { getShapeStylePresetPatch } from '../constants/shapeStylePresets'
+import { ZOOM_STEP } from '../movements/zooming'
 import {
   buildStrokePathData,
   clamp,
   CONNECTOR_STROKE_COLOR,
   CONNECTOR_STROKE_WIDTH,
   defaultShapeStyles,
-  extractShapeType,
   getAlignmentGuideLines,
   getRulerMarks,
   getSelectedBoundsWorld,
@@ -19,11 +27,9 @@ import {
   getShapeSize,
   getShapeVisualStyle,
   getWorldPoint,
-  hasShapePayload,
   PEN_MOVE_THRESHOLD_PX,
   PEN_STROKE_COLOR,
   PEN_STROKE_WIDTH,
-  supportedShapeTypes,
   worldToScreenPoint,
 } from './canvas/canvasUtils'
 
@@ -37,12 +43,12 @@ function DraggableGridCanvas({
   showRuler,
   showAlignmentGuides,
   onConnectionsChange,
+  onEditSelectedNode,
 }) {
   const viewportRef = useRef(null)
-  const [isDropTarget, setIsDropTarget] = useState(false)
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
 
   const isPenTool = activeTool === 'pen'
+  const viewportSize = useViewportSize(viewportRef)
 
   const minorGrid = 24 * viewport.zoom
   const majorGrid = minorGrid * 5
@@ -111,6 +117,16 @@ function DraggableGridCanvas({
     viewport,
   })
 
+  const {
+    isDropTarget,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useCanvasDropTarget({
+    viewport,
+    onAddShape,
+  })
+
   const handleViewportPointerDown = (event) => {
     if (isPenTool && event.button === 0) {
       startPenStroke(event)
@@ -148,80 +164,19 @@ function DraggableGridCanvas({
     handlePointerCancel(event)
   }
 
-  const connectionArrowMarkerId = 'grid-workspace-connection-arrowhead'
-
-  useEffect(() => {
-    if (!viewportRef.current) {
-      return undefined
-    }
-
-    const syncViewportSize = () => {
-      if (!viewportRef.current) {
-        return
-      }
-
-      const rect = viewportRef.current.getBoundingClientRect()
-      setViewportSize({ width: rect.width, height: rect.height })
-    }
-
-    syncViewportSize()
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', syncViewportSize)
-      return () => {
-        window.removeEventListener('resize', syncViewportSize)
-      }
-    }
-
-    const resizeObserver = new ResizeObserver(syncViewportSize)
-    resizeObserver.observe(viewportRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [])
-
   const handleWheel = (event) => {
     if (!event.ctrlKey) {
       return
     }
 
     event.preventDefault()
-    const delta = event.deltaY < 0 ? 0.1 : -0.1
+    const delta = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP
 
     updateViewport({
       x: viewport.x,
       y: viewport.y,
       zoom: viewport.zoom + delta,
     })
-  }
-
-  const handleDragOver = (event) => {
-    if (!hasShapePayload(event.dataTransfer)) {
-      return
-    }
-
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-    setIsDropTarget(true)
-  }
-
-  const handleDragLeave = () => {
-    setIsDropTarget(false)
-  }
-
-  const handleDrop = (event) => {
-    const shapeType = extractShapeType(event.dataTransfer)
-
-    if (!supportedShapeTypes.has(shapeType)) {
-      setIsDropTarget(false)
-      return
-    }
-
-    event.preventDefault()
-    setIsDropTarget(false)
-    const worldPoint = getWorldPoint(event, event.currentTarget, viewport)
-    onAddShape(shapeType, worldPoint)
   }
 
   const getMarqueeStyle = () => {
@@ -263,6 +218,16 @@ function DraggableGridCanvas({
         ...stylePatch,
       }
     }))
+  }
+
+  const canEditSelected = selectedShapeIds.length === 1
+
+  const handleEditSelected = () => {
+    if (!canEditSelected || typeof onEditSelectedNode !== 'function') {
+      return
+    }
+
+    onEditSelectedNode(selectedShapeIds[0])
   }
 
   const deleteSelectedShapes = useCallback(() => {
@@ -360,28 +325,11 @@ function DraggableGridCanvas({
             isConnectMode={isConnecting}
             onToolbarOffsetDelta={onToolbarOffsetDelta}
             onApplyPreset={(preset) => {
-              if (preset === 'outline') {
-                applyStylePatchToSelection({
-                  fillColor: '#ffffff',
-                  strokeColor: '#1a73e8',
-                  strokeWidth: 2,
-                  opacity: 1,
-                })
-                return
-              }
-
-              if (preset === 'highlight') {
-                applyStylePatchToSelection({
-                  fillColor: '#ffd86b',
-                  strokeColor: '#a56b00',
-                  strokeWidth: 3,
-                  opacity: 1,
-                })
-                return
-              }
-
-              applyStylePatchToSelection(defaultShapeStyles)
+              const presetPatch = getShapeStylePresetPatch(preset)
+              applyStylePatchToSelection(presetPatch || defaultShapeStyles)
             }}
+            onEditSelected={handleEditSelected}
+            canEditSelected={canEditSelected}
             onDeleteSelected={deleteSelectedShapes}
           />
         )}
@@ -439,7 +387,7 @@ function DraggableGridCanvas({
           <svg className="grid-workspace__connection-layer" aria-hidden="true">
             <defs>
               <marker
-                id={connectionArrowMarkerId}
+                id={CONNECTION_ARROW_MARKER_ID}
                 viewBox="0 0 10 10"
                 refX="8.5"
                 refY="5"
@@ -463,7 +411,7 @@ function DraggableGridCanvas({
                 y2={segment.end.y}
                 stroke={CONNECTOR_STROKE_COLOR}
                 strokeWidth={CONNECTOR_STROKE_WIDTH}
-                markerEnd={`url(#${connectionArrowMarkerId})`}
+                markerEnd={`url(#${CONNECTION_ARROW_MARKER_ID})`}
               />
             ))}
           </svg>
@@ -475,6 +423,9 @@ function DraggableGridCanvas({
             const screenPosition = getShapeScreenPosition(shape, viewport)
             const isSelected = selectedShapeIdSet.has(shape.id)
             const visualStyle = getShapeVisualStyle(shape)
+            const shapeKind = getKindByShapeType(shape.type)
+            const shapeFileName = typeof shape?.payload?.FileName === 'string' ? shape.payload.FileName.trim() : ''
+            const showFileNameLabel = shapeKind === 'file' && shapeFileName && shapeFileName !== DEFAULT_FILE_NAME
             return (
               <div
                 key={`shape-body-${shape.id}`}
@@ -495,6 +446,8 @@ function DraggableGridCanvas({
                     opacity: clamp(visualStyle.opacity, 0.2, 1),
                   }}
                 />
+
+                {showFileNameLabel && <span className="canvas-shape__name">{shapeFileName}</span>}
 
                 {isSelected && (
                   <button
