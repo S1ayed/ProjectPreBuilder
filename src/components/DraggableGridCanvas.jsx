@@ -40,6 +40,7 @@ function DraggableGridCanvas({
   viewport,
   onViewportChange,
   shapes,
+  connections,
   onAddShape,
   onShapesChange,
   activeTool,
@@ -51,7 +52,6 @@ function DraggableGridCanvas({
   onConnectionToolModeComplete,
 }) {
   const viewportRef = useRef(null)
-  const lastEmittedConnectionsRef = useRef('')
   const [editingConnectionId, setEditingConnectionId] = useState(null)
 
   const isPenTool = activeTool === 'pen'
@@ -121,6 +121,8 @@ function DraggableGridCanvas({
     isDirectionalConnectionToolActive,
   } = useShapeConnections({
     shapes,
+    connections,
+    onConnectionsChange,
     selectedShapeIds,
     isPenTool,
     viewport,
@@ -304,20 +306,6 @@ function DraggableGridCanvas({
     viewport,
     viewportSize,
   })
-
-  useEffect(() => {
-    if (typeof onConnectionsChange !== 'function') {
-      return
-    }
-
-    const nextSnapshot = JSON.stringify(validShapeConnections)
-    if (lastEmittedConnectionsRef.current === nextSnapshot) {
-      return
-    }
-
-    lastEmittedConnectionsRef.current = nextSnapshot
-    onConnectionsChange(validShapeConnections)
-  }, [onConnectionsChange, validShapeConnections])
 
   return (
     <section className="grid-workspace" aria-label="绘图工作区">

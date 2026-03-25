@@ -1,8 +1,44 @@
-function CanvasTopBar({ zoom, onZoomIn, onZoomOut, onResetView, onExport }) {
+function CanvasTopBar({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onResetView,
+  onExport,
+  onSave,
+  onLoad,
+}) {
+  const handleMenuItemClick = (handler) => (event) => {
+    handler?.()
+    const menu = event.currentTarget.closest('details')
+    if (menu) {
+      menu.removeAttribute('open')
+    }
+  }
+
   return (
     <header className="canvas-topbar">
       <div className="canvas-topbar__left">
-        <button type="button" className="canvas-topbar__btn">文件</button>
+        <details className="canvas-topbar__menu">
+          <summary className="canvas-topbar__btn canvas-topbar__menu-trigger">文件</summary>
+          <div className="canvas-topbar__menu-list" role="menu" aria-label="文件菜单">
+            <button
+              type="button"
+              className="canvas-topbar__menu-item"
+              role="menuitem"
+              onClick={handleMenuItemClick(onSave)}
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              className="canvas-topbar__menu-item"
+              role="menuitem"
+              onClick={handleMenuItemClick(onLoad)}
+            >
+              读取
+            </button>
+          </div>
+        </details>
         <button type="button" className="canvas-topbar__btn">编辑</button>
         <button type="button" className="canvas-topbar__btn">视图</button>
       </div>

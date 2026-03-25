@@ -450,6 +450,54 @@
   cursor: pointer;
 }
 
+.canvas-topbar__menu {
+  position: relative;
+}
+
+.canvas-topbar__menu summary {
+  list-style: none;
+}
+
+.canvas-topbar__menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.canvas-topbar__menu[open] .canvas-topbar__menu-trigger {
+  border-color: #8ebfa4;
+  background: #f3faf6;
+}
+
+.canvas-topbar__menu-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 110px;
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 20px rgba(30, 56, 42, 0.14);
+  display: grid;
+  gap: 4px;
+  z-index: 20;
+}
+
+.canvas-topbar__menu-item {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: clamp(0.76rem, 0.9vw, 0.83rem);
+  font-weight: 600;
+  padding: 7px 9px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-topbar__menu-item:hover {
+  background: #edf6f0;
+}
+
 .canvas-topbar__icon {
   min-width: 33px;
   padding: 7px 0;

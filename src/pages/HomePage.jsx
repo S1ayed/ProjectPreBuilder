@@ -18,6 +18,11 @@ import {
   getZoomInViewport,
   getZoomOutViewport,
 } from '../movements/zooming'
+import {
+  buildSnapshotFromState,
+  loadSnapshotFromLocalStorage,
+  saveSnapshotToLocalStorage,
+} from '../utils/localSnapshot'
 import './HomePage.css'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -28,6 +33,30 @@ const getSidebarBounds = (viewportWidth) => {
   const min = viewportWidth > 1200 ? 360 : 300
   const max = Math.min(620, Math.max(360, Math.round(viewportWidth * 0.56)))
   return { min, max }
+}
+
+const getNextShapeIdCounter = (shapes) => {
+  if (!Array.isArray(shapes) || shapes.length === 0) {
+    return 0
+  }
+
+  return shapes.reduce((maxValue, shape) => {
+    if (!shape || typeof shape.id !== 'string') {
+      return maxValue
+    }
+
+    const match = /^shape-(\d+)$/.exec(shape.id)
+    if (!match) {
+      return maxValue
+    }
+
+    const value = Number(match[1])
+    if (!Number.isFinite(value)) {
+      return maxValue
+    }
+
+    return Math.max(maxValue, value + 1)
+  }, 0)
 }
 
 function HomePage() {
@@ -311,6 +340,74 @@ function HomePage() {
     URL.revokeObjectURL(objectUrl)
   }
 
+  const handleSaveWorkspaceSnapshot = () => {
+    const snapshot = buildSnapshotFromState({
+      viewport,
+      assist: workspaceAssist,
+      shapes: canvasShapes,
+      connections: canvasConnections,
+    })
+
+    try {
+      saveSnapshotToLocalStorage(snapshot)
+      alert('本地暂存已保存')
+    } catch (error) {
+      if (error.message === 'SNAPSHOT_QUOTA_EXCEEDED') {
+        alert('本地存储空间不足，建议导出 JSON 备份')
+        return
+      }
+
+      alert('保存失败，请稍后重试或导出 JSON 备份')
+    }
+  }
+
+  const handleLoadWorkspaceSnapshot = () => {
+    const shouldContinue = window.confirm('读取会覆盖当前画布内容，是否继续？')
+    if (!shouldContinue) {
+      return
+    }
+
+    try {
+      const snapshot = loadSnapshotFromLocalStorage()
+      const nextViewport = getNormalizedViewport(snapshot.workspace.viewport)
+      const nextAssist = {
+        showRuler: Boolean(snapshot.workspace.assist?.showRuler),
+        showAlignmentGuides: Boolean(snapshot.workspace.assist?.showAlignmentGuides),
+      }
+      const nextShapes = snapshot.canvas.shapes
+      const nextConnections = snapshot.canvas.connections
+
+      setViewport(nextViewport)
+      setWorkspaceAssist(nextAssist)
+      setCanvasShapes(nextShapes)
+      setCanvasConnections(nextConnections)
+      setEditingNodeId(null)
+      setConnectionToolMode(null)
+      setActiveTool('select')
+      shapeIdRef.current = getNextShapeIdCounter(nextShapes)
+
+      const savedAtText = typeof snapshot.savedAt === 'string' ? `（保存时间：${snapshot.savedAt}）` : ''
+      alert(`本地暂存读取成功${savedAtText}`)
+    } catch (error) {
+      if (error.message === 'SNAPSHOT_NOT_FOUND') {
+        alert('未找到本地暂存数据')
+        return
+      }
+
+      if (error.message === 'SNAPSHOT_PARSE_FAILED') {
+        alert('本地暂存数据已损坏，无法读取')
+        return
+      }
+
+      if (error.message === 'SNAPSHOT_INVALID') {
+        alert('本地暂存数据不完整或版本不兼容')
+        return
+      }
+
+      alert('读取失败，请稍后重试')
+    }
+  }
+
   return (
     <div className={homeClassName}>
       <div className="home-page__gradient" aria-hidden="true" />
@@ -351,11 +448,14 @@ function HomePage() {
             onZoomOut={handleZoomOut}
             onResetView={handleResetView}
             onExport={handleExportModel}
+            onSave={handleSaveWorkspaceSnapshot}
+            onLoad={handleLoadWorkspaceSnapshot}
           />
           <DraggableGridCanvas
             viewport={viewport}
             onViewportChange={updateViewport}
             shapes={canvasShapes}
+            connections={canvasConnections}
             onAddShape={handleAddShape}
             onShapesChange={setCanvasShapes}
             onConnectionsChange={setCanvasConnections}
