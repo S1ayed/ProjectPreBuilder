@@ -1,4 +1,4 @@
 
 # ProjectPreBuilder
 
-Write your prompts and manage your project structure in a WebUI. Make vibe coding easier
+Write your prompts and manage your project structure in a WebUI. Make vibe coding easier and more controllable.
