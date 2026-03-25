@@ -71,6 +71,17 @@ function PropertyPanel({ node, onClose, onSave }) {
     })
   }
 
+  const handleFormKeyDown = (event) => {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    const targetTagName = event.target?.tagName
+    if (targetTagName === 'INPUT') {
+      event.preventDefault()
+    }
+  }
+
   return (
     <div className="node-property-panel__overlay" role="dialog" aria-modal="true" aria-label="节点属性编辑面板">
       <section className="node-property-panel">
@@ -82,7 +93,7 @@ function PropertyPanel({ node, onClose, onSave }) {
           <button type="button" className="node-property-panel__close" onClick={onClose} aria-label="关闭面板">×</button>
         </header>
 
-        <form className="node-property-panel__form" onSubmit={handleSubmit}>
+        <form className="node-property-panel__form" onSubmit={handleSubmit} onKeyDown={handleFormKeyDown}>
           <label className="node-property-panel__label" htmlFor="node-kind-readonly">
             节点类型
             <input
