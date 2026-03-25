@@ -11,6 +11,8 @@ import {
   normalizeNodePayload,
 } from '../constants/nodeKinds'
 import { getShapeDefaultSize, getShapeDefaultStyle } from '../constants/shapeConfigs'
+import { useExportModel } from '../hooks/useExportModel'
+import { useImportModel } from '../hooks/useImportModel'
 import { toolItems } from '../constants/toolItems'
 import {
   getNormalizedViewport,
@@ -18,11 +20,8 @@ import {
   getZoomInViewport,
   getZoomOutViewport,
 } from '../movements/zooming'
-import {
-  buildSnapshotFromState,
-  loadSnapshotFromLocalStorage,
-  saveSnapshotToLocalStorage,
-} from '../utils/localSnapshot'
+import { useLoadWorkspaceSnapshot } from '../hooks/useLoadWorkspaceSnapshot'
+import { useSaveWorkspaceSnapshot } from '../hooks/useSaveWorkspaceSnapshot'
 import './HomePage.css'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
@@ -78,6 +77,27 @@ function HomePage() {
   const resizeAnimationFrameRef = useRef(0)
   const pendingSidebarWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH)
   const shapeIdRef = useRef(0)
+  const handleSaveWorkspaceSnapshot = useSaveWorkspaceSnapshot({
+    viewport,
+    assist: workspaceAssist,
+    shapes: canvasShapes,
+    connections: canvasConnections,
+  })
+  const loadWorkspaceSnapshot = useLoadWorkspaceSnapshot()
+  const handleExportModel = useExportModel({
+    shapes: canvasShapes,
+    connections: canvasConnections,
+  })
+  const handleImportModel = useImportModel({
+    onImported: ({ shapes, connections }) => {
+      setCanvasShapes(shapes)
+      setCanvasConnections(connections)
+      setEditingNodeId(null)
+      setConnectionToolMode(null)
+      setActiveTool('select')
+      shapeIdRef.current = getNextShapeIdCounter(shapes)
+    },
+  })
 
   useEffect(() => () => {
     if (resizeAnimationFrameRef.current) {
@@ -266,249 +286,31 @@ function HomePage() {
     setConnectionToolMode(null)
   }
 
-  const handleExportModel = () => {
-    const nodes = canvasShapes.map((shape) => {
-      const kind = getKindByShapeType(shape.type)
-      return {
-        id: shape.id,
-        kind,
-        type: shape.type,
-        payload: normalizeNodePayload(kind, shape.payload),
-        geometry: {
-          x: shape.x,
-          y: shape.y,
-          width: shape.width,
-          height: shape.height,
-        },
-        style: {
-          fillColor: shape.fillColor,
-          strokeColor: shape.strokeColor,
-          strokeWidth: shape.strokeWidth,
-          opacity: shape.opacity,
-        },
-      }
-    })
-
-    const relations = canvasConnections.map((connection) => {
-      const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
-      const dependencyType = relationKind === 'depends_on'
-        ? (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
-          ? connection.dependencyType.trim()
-          : 'depends_on')
-        : null
-
-      return {
-        id: connection.id,
-        relationKind,
-        from: connection.fromShapeId,
-        to: connection.toShapeId,
-        dependencyType,
-      }
-    })
-
-    const structureRelations = relations.filter((relation) => relation.relationKind === 'contains')
-    const dependencies = relations
-      .filter((relation) => relation.relationKind === 'depends_on')
-      .map((relation) => ({
-        id: relation.id,
-        from: relation.from,
-        to: relation.to,
-        type: relation.dependencyType || 'depends_on',
-      }))
-
-    const model = {
-      nodes,
-      structureRelations,
-      dependencies,
-      relations,
-      meta: {
-        version: '1.0.0',
-        exportedAt: new Date().toISOString(),
-        source: 'ProjectPreBuilder',
-      },
-    }
-
-    const fileContent = `${JSON.stringify(model, null, 2)}\n`
-    const blob = new Blob([fileContent], { type: 'application/json;charset=utf-8' })
-    const objectUrl = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = objectUrl
-    anchor.download = 'prebuilder-model.json'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(objectUrl)
-  }
-
-  const handleImportModel = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json,application/json'
-
-    input.onchange = async (event) => {
-      const file = event.target.files?.[0]
-      if (!file) {
-        return
-      }
-
-      try {
-        const content = await file.text()
-        const parsed = JSON.parse(content)
-
-        const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : []
-        const relationsSource = Array.isArray(parsed?.relations)
-          ? parsed.relations
-          : [
-            ...(Array.isArray(parsed?.structureRelations) ? parsed.structureRelations : []),
-            ...(Array.isArray(parsed?.dependencies) ? parsed.dependencies.map((item) => ({
-              ...item,
-              relationKind: 'depends_on',
-              dependencyType: item?.type,
-            })) : []),
-          ]
-
-        const importedShapes = nodes
-          .filter((node) => node && typeof node === 'object' && typeof node.id === 'string' && node.id)
-          .map((node) => {
-            const kind = typeof node.kind === 'string' ? node.kind : getKindByShapeType(node.type)
-            const geometry = node.geometry && typeof node.geometry === 'object' ? node.geometry : {}
-            const style = node.style && typeof node.style === 'object' ? node.style : {}
-            const shapeType = getShapeTypeByKind(kind)
-            const defaultSize = getShapeDefaultSize(shapeType)
-            const defaultStyle = getShapeDefaultStyle(shapeType)
-
-            return {
-              id: node.id,
-              type: shapeType,
-              kind,
-              payload: normalizeNodePayload(kind, node.payload),
-              x: Number.isFinite(geometry.x) ? geometry.x : 0,
-              y: Number.isFinite(geometry.y) ? geometry.y : 0,
-              width: Number.isFinite(geometry.width) ? geometry.width : defaultSize.width,
-              height: Number.isFinite(geometry.height) ? geometry.height : defaultSize.height,
-              fillColor: typeof style.fillColor === 'string' && style.fillColor ? style.fillColor : defaultStyle.fillColor,
-              strokeColor: typeof style.strokeColor === 'string' && style.strokeColor ? style.strokeColor : defaultStyle.strokeColor,
-              strokeWidth: Number.isFinite(style.strokeWidth) ? style.strokeWidth : defaultStyle.strokeWidth,
-              opacity: Number.isFinite(style.opacity) ? style.opacity : defaultStyle.opacity,
-            }
-          })
-
-        const validShapeIdSet = new Set(importedShapes.map((shape) => shape.id))
-        const importedConnections = relationsSource
-          .filter((relation) => relation && typeof relation === 'object')
-          .map((relation, index) => {
-            const relationKind = relation.relationKind === 'depends_on' ? 'depends_on' : 'contains'
-            const fromShapeId = typeof relation.fromShapeId === 'string' ? relation.fromShapeId : relation.from
-            const toShapeId = typeof relation.toShapeId === 'string' ? relation.toShapeId : relation.to
-
-            return {
-              id: typeof relation.id === 'string' && relation.id ? relation.id : `connection-${index}`,
-              fromShapeId,
-              toShapeId,
-              relationKind,
-              dependencyType: relationKind === 'depends_on'
-                ? (typeof relation.dependencyType === 'string' && relation.dependencyType.trim()
-                  ? relation.dependencyType.trim()
-                  : 'depends_on')
-                : null,
-            }
-          })
-          .filter((relation) => (
-            typeof relation.fromShapeId === 'string'
-            && relation.fromShapeId
-            && typeof relation.toShapeId === 'string'
-            && relation.toShapeId
-            && relation.fromShapeId !== relation.toShapeId
-            && validShapeIdSet.has(relation.fromShapeId)
-            && validShapeIdSet.has(relation.toShapeId)
-          ))
-
-        if (importedShapes.length === 0) {
-          alert('导入失败：JSON 中未找到可用节点数据')
-          return
-        }
-
-        setCanvasShapes(importedShapes)
-        setCanvasConnections(importedConnections)
-        setEditingNodeId(null)
-        setConnectionToolMode(null)
-        setActiveTool('select')
-        shapeIdRef.current = getNextShapeIdCounter(importedShapes)
-        alert(`导入成功：${importedShapes.length} 个节点，${importedConnections.length} 条连线`)
-      } catch {
-        alert('导入失败：JSON 格式无效或数据不兼容')
-      }
-    }
-
-    input.click()
-  }
-
-  const handleSaveWorkspaceSnapshot = () => {
-    const snapshot = buildSnapshotFromState({
-      viewport,
-      assist: workspaceAssist,
-      shapes: canvasShapes,
-      connections: canvasConnections,
-    })
-
-    try {
-      saveSnapshotToLocalStorage(snapshot)
-      alert('本地暂存已保存')
-    } catch (error) {
-      if (error.message === 'SNAPSHOT_QUOTA_EXCEEDED') {
-        alert('本地存储空间不足，建议导出 JSON 备份')
-        return
-      }
-
-      alert('保存失败，请稍后重试或导出 JSON 备份')
-    }
-  }
-
   const handleLoadWorkspaceSnapshot = () => {
-    const shouldContinue = window.confirm('读取会覆盖当前画布内容，是否继续？')
-    if (!shouldContinue) {
+    const snapshot = loadWorkspaceSnapshot()
+    if (!snapshot) {
       return
     }
 
-    try {
-      const snapshot = loadSnapshotFromLocalStorage()
-      const nextViewport = getNormalizedViewport(snapshot.workspace.viewport)
-      const nextAssist = {
-        showRuler: Boolean(snapshot.workspace.assist?.showRuler),
-        showAlignmentGuides: Boolean(snapshot.workspace.assist?.showAlignmentGuides),
-      }
-      const nextShapes = snapshot.canvas.shapes
-      const nextConnections = snapshot.canvas.connections
-
-      setViewport(nextViewport)
-      setWorkspaceAssist(nextAssist)
-      setCanvasShapes(nextShapes)
-      setCanvasConnections(nextConnections)
-      setEditingNodeId(null)
-      setConnectionToolMode(null)
-      setActiveTool('select')
-      shapeIdRef.current = getNextShapeIdCounter(nextShapes)
-
-      const savedAtText = typeof snapshot.savedAt === 'string' ? `（保存时间：${snapshot.savedAt}）` : ''
-      alert(`本地暂存读取成功${savedAtText}`)
-    } catch (error) {
-      if (error.message === 'SNAPSHOT_NOT_FOUND') {
-        alert('未找到本地暂存数据')
-        return
-      }
-
-      if (error.message === 'SNAPSHOT_PARSE_FAILED') {
-        alert('本地暂存数据已损坏，无法读取')
-        return
-      }
-
-      if (error.message === 'SNAPSHOT_INVALID') {
-        alert('本地暂存数据不完整或版本不兼容')
-        return
-      }
-
-      alert('读取失败，请稍后重试')
+    const nextViewport = getNormalizedViewport(snapshot.workspace.viewport)
+    const nextAssist = {
+      showRuler: Boolean(snapshot.workspace.assist?.showRuler),
+      showAlignmentGuides: Boolean(snapshot.workspace.assist?.showAlignmentGuides),
     }
+    const nextShapes = snapshot.canvas.shapes
+    const nextConnections = snapshot.canvas.connections
+
+    setViewport(nextViewport)
+    setWorkspaceAssist(nextAssist)
+    setCanvasShapes(nextShapes)
+    setCanvasConnections(nextConnections)
+    setEditingNodeId(null)
+    setConnectionToolMode(null)
+    setActiveTool('select')
+    shapeIdRef.current = getNextShapeIdCounter(nextShapes)
+
+    const savedAtText = typeof snapshot.savedAt === 'string' ? `（保存时间：${snapshot.savedAt}）` : ''
+    alert(`本地暂存读取成功${savedAtText}`)
   }
 
   return (
