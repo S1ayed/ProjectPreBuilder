@@ -84,6 +84,8 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
         "GenerationStrategy": { "type": "string", "default": "template-driven" },
         "TemplateID": { "type": "string", "default": "" },
         "Directives": { "type": "object", "default": {} },
+        "SensitiveDirectives": { "type": "object", "default": {} },
+        "RuleRefs": { "type": "string[]", "default": [] },
         "Constraints": { "type": "string[]", "default": [] }
       }
     }
@@ -171,6 +173,10 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 - 必填字段：
   - `ConfigName`
   - `ConfigFormat`
+- 建议字段：
+  - `Directives`：普通生成指令。
+  - `SensitiveDirectives`：敏感指令（如依赖变更、密钥占位、外部源接入等高风险动作）。
+  - `RuleRefs`：关联的 Rule 节点 ID 列表，用于与 Rule 节点联动。
 
 示例：
 
@@ -187,9 +193,20 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
       "dev": "nodemon index.js"
     }
   },
+  "SensitiveDirectives": {
+    "dependencyChangesRequireApproval": true,
+    "secretPlaceholders": ["API_KEY", "JWT_SECRET"]
+  },
+  "RuleRefs": ["rule_1"],
   "Constraints": ["Must use ES Modules", "Version should be 1.0.0"]
 }
 ```
+
+字段说明：
+
+- `Directives`：用于表达常规生成要求。
+- `SensitiveDirectives`：用于表达需要额外审慎处理的高风险要求。
+- `RuleRefs`：用于显式声明当前 Config 节点受哪些 Rule 约束。
 
 ### 4.6 kind: `rule`
 
@@ -202,7 +219,7 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 
 建议结构(以下仅为示例)：
 
-```jsonc
+```json
 {
   "id": "rule_1",
   "type": "rule",
@@ -249,7 +266,7 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 
 - 新建文档时必须自动生成：
   - 1 个 `project` 节点。
-  - 1 个 `directory` 节点（`src`）。
+  - 1 个 `directory` 节点（命名为`src`）。
 - 初始化后可允许用户继续添加 `file` 与 `config` 节点。
 
 ## 7. 导出目标
@@ -260,4 +277,4 @@ ProjectPreBuilder 是一个单向建模系统。用户在 Web UI 中通过拖拽
 - `dependencies`：有向依赖关系。
 - `meta`：文档版本、创建时间、工具版本。
 
-该结构将作为 LLM 构建项目的输入契约。
+该JSON结构将作为 LLM 构建项目的输入契约。
