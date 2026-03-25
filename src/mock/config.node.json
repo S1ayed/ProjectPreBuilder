@@ -1,0 +1,19 @@
+{
+  "ConfigName": "package.json",
+  "ConfigFormat": "json",
+  "GenerationStrategy": "template-driven",
+  "TemplateID": "nodejs-backend-standard",
+  "Directives": {
+    "includeDependencies": ["express", "dotenv"],
+    "scripts": {
+      "start": "node index.js",
+      "dev": "nodemon index.js"
+    }
+  },
+  "SensitiveDirectives": {
+    "dependencyChangesRequireApproval": true,
+    "secretPlaceholders": ["API_KEY", "JWT_SECRET"]
+  },
+  "RuleRefs": ["rule_1"],
+  "Constraints": ["Must use ES Modules", "Version should be 1.0.0"]
+}

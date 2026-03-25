@@ -1,0 +1,5 @@
+{
+  "ProjectName": "my-app",
+  "ProjectDescription": "一个用于演示的前后端项目",
+  "stack": ["react", "vite", "node.js"]
+}

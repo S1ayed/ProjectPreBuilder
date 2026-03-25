@@ -1,0 +1,6 @@
+{
+  "id": "connection-0",
+  "from": "shape-file-login-route",
+  "to": "shape-file-auth-service",
+  "type": "import"
+}

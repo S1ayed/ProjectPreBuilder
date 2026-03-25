@@ -1,0 +1,12 @@
+{
+  "FileName": "auth.route.js",
+  "FileType": "backend.express.route",
+  "Prompt": {
+    "generation": {
+      "goal": "实现用户登录接口",
+      "inputs": ["username", "password"],
+      "outputs": ["token"],
+      "constraints": ["use express", "use jwt"]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "rule_1",
+  "type": "rule",
+  "enabled": true,
+  "scope": "global",
+  "rule_condition": "hard",
+  "content": "禁止在未授权情况下引入第三方库",
+  "examples": [
+    "正例：在新增第三方依赖前先通知用户并获得授权。",
+    "反例：未告知用户直接安装并使用第三方库。"
+  ]
+}
