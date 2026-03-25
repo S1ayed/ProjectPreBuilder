@@ -565,6 +565,11 @@
   stroke: #345f95;
 }
 
+.grid-workspace__connection-hitline {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
 .grid-workspace__guide-line {
   position: absolute;
   pointer-events: none;

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ShapeStyleToolbar from './ShapeStyleToolbar'
+import { resolvedConnectionPanelRegistry } from './resolvedKindPanel'
 import { useCanvasMouseActions } from '../movements/canvasMouseActions'
 import { usePenStrokes } from '../hooks/usePenStrokes'
 import { useCanvasDropTarget } from '../hooks/useCanvasDropTarget'
@@ -51,6 +52,7 @@ function DraggableGridCanvas({
 }) {
   const viewportRef = useRef(null)
   const lastEmittedConnectionsRef = useRef('')
+  const [editingConnectionId, setEditingConnectionId] = useState(null)
 
   const isPenTool = activeTool === 'pen'
   const viewportSize = useViewportSize(viewportRef)
@@ -113,6 +115,7 @@ function DraggableGridCanvas({
     toggleConnectionMode,
     tryHandleConnectionPointerDown,
     removeConnectionsByShapeIds,
+    updateConnectionById,
     validShapeConnections,
     connectorSegments,
     isDirectionalConnectionToolActive,
@@ -229,6 +232,12 @@ function DraggableGridCanvas({
   }
 
   const canEditSelected = selectedShapeIds.length === 1
+  const editingConnection = useMemo(() => (
+    validShapeConnections.find((connection) => connection.id === editingConnectionId) || null
+  ), [validShapeConnections, editingConnectionId])
+  const ResolvedConnectionPanel = editingConnection
+    ? resolvedConnectionPanelRegistry[editingConnection.relationKind]
+    : null
 
   const handleEditSelected = () => {
     if (!canEditSelected || typeof onEditSelectedNode !== 'function') {
@@ -413,21 +422,38 @@ function DraggableGridCanvas({
               </marker>
             </defs>
             {connectorSegments.map((segment) => (
-              <line
-                key={segment.id}
-                className={`grid-workspace__connection-line ${segment.relationKind === 'depends_on' ? 'grid-workspace__connection-line--directional' : ''}`}
-                data-from-shape-id={segment.fromShapeId}
-                data-to-shape-id={segment.toShapeId}
-                data-relation-kind={segment.relationKind}
-                data-dependency-type={segment.dependencyType || ''}
-                x1={segment.start.x}
-                y1={segment.start.y}
-                x2={segment.end.x}
-                y2={segment.end.y}
-                stroke={CONNECTOR_STROKE_COLOR}
-                strokeWidth={CONNECTOR_STROKE_WIDTH}
-                markerEnd={segment.relationKind === 'depends_on' ? `url(#${DIRECTIONAL_CONNECTION_MARKER_ID})` : undefined}
-              />
+              <g key={segment.id}>
+                <line
+                  className={`grid-workspace__connection-line ${segment.relationKind === 'depends_on' ? 'grid-workspace__connection-line--directional' : ''}`}
+                  data-from-shape-id={segment.fromShapeId}
+                  data-to-shape-id={segment.toShapeId}
+                  data-relation-kind={segment.relationKind}
+                  data-dependency-type={segment.dependencyType || ''}
+                  x1={segment.start.x}
+                  y1={segment.start.y}
+                  x2={segment.end.x}
+                  y2={segment.end.y}
+                  stroke={CONNECTOR_STROKE_COLOR}
+                  strokeWidth={CONNECTOR_STROKE_WIDTH}
+                  markerEnd={segment.relationKind === 'depends_on' ? `url(#${DIRECTIONAL_CONNECTION_MARKER_ID})` : undefined}
+                />
+                {segment.relationKind === 'depends_on' && (
+                  <line
+                    className="grid-workspace__connection-hitline"
+                    x1={segment.start.x}
+                    y1={segment.start.y}
+                    x2={segment.end.x}
+                    y2={segment.end.y}
+                    stroke="transparent"
+                    strokeWidth={14}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation()
+                      setEditingConnectionId(segment.id)
+                    }}
+                  />
+                )}
+              </g>
             ))}
           </svg>
         )}
@@ -520,6 +546,19 @@ function DraggableGridCanvas({
         <span>Offset Y: {Math.round(viewport.y)}</span>
         <span>Zoom: {Math.round(viewport.zoom * 100)}%</span>
       </div>
+
+      {editingConnection && ResolvedConnectionPanel && (
+        <ResolvedConnectionPanel
+          key={editingConnection.id}
+          connection={editingConnection}
+          shapes={shapes}
+          onClose={() => setEditingConnectionId(null)}
+          onSave={({ id, dependencyType }) => {
+            updateConnectionById(id, { dependencyType })
+            setEditingConnectionId(null)
+          }}
+        />
+      )}
     </section>
   )
 }

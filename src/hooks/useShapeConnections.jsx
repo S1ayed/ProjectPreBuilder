@@ -208,6 +208,32 @@ export function useShapeConnections({
     )))
   }, [])
 
+  const updateConnectionById = useCallback((connectionId, patch) => {
+    if (!connectionId || !patch || typeof patch !== 'object') {
+      return
+    }
+
+    setShapeConnections((previousConnections) => previousConnections.map((connection) => {
+      if (connection.id !== connectionId) {
+        return connection
+      }
+
+      const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
+      const nextDependencyType = relationKind === 'depends_on'
+        ? (typeof patch.dependencyType === 'string' && patch.dependencyType.trim()
+          ? patch.dependencyType.trim()
+          : (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
+            ? connection.dependencyType.trim()
+            : 'depends_on'))
+        : null
+
+      return {
+        ...connection,
+        dependencyType: nextDependencyType,
+      }
+    }))
+  }, [])
+
   const shapeById = new Map(shapes.map((shape) => [shape.id, shape]))
   const validShapeConnections = shapeConnections.filter((connection) => (
     shapeById.has(connection.fromShapeId) && shapeById.has(connection.toShapeId)
@@ -255,6 +281,7 @@ export function useShapeConnections({
     toggleConnectionMode,
     tryHandleConnectionPointerDown,
     removeConnectionsByShapeIds,
+    updateConnectionById,
     validShapeConnections,
     connectorSegments,
   }

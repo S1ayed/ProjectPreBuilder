@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import WorkbenchSidebar from '../components/WorkbenchSidebar'
 import CanvasTopBar from '../components/CanvasTopBar'
 import DraggableGridCanvas from '../components/DraggableGridCanvas'
-import NodePropertyPanel from '../components/NodePropertyPanel'
+import PropertyPanel from '../components/PropertyPanel'
 import { layerItems } from '../constants/layerItems'
 import {
   getDefaultNodePayload,
@@ -370,7 +370,7 @@ function HomePage() {
       </div>
 
       {editingNode && (
-        <NodePropertyPanel
+        <PropertyPanel
           key={editingNode.id}
           node={editingNode}
           onClose={() => setEditingNodeId(null)}
