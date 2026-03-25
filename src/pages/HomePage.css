@@ -498,6 +498,21 @@
   background: #edf6f0;
 }
 
+.canvas-topbar__menu-group-label {
+  padding: 5px 9px 3px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: #5f7b6b;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.canvas-topbar__menu-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: #dfe8e2;
+}
+
 .canvas-topbar__icon {
   min-width: 33px;
   padding: 7px 0;

@@ -6,6 +6,8 @@ function CanvasTopBar({
   onExport,
   onSave,
   onLoad,
+  onExportJson,
+  onImportJson,
 }) {
   const handleMenuItemClick = (handler) => (event) => {
     handler?.()
@@ -21,13 +23,14 @@ function CanvasTopBar({
         <details className="canvas-topbar__menu">
           <summary className="canvas-topbar__btn canvas-topbar__menu-trigger">文件</summary>
           <div className="canvas-topbar__menu-list" role="menu" aria-label="文件菜单">
+            <div className="canvas-topbar__menu-group-label" role="presentation">本地暂存</div>
             <button
               type="button"
               className="canvas-topbar__menu-item"
               role="menuitem"
               onClick={handleMenuItemClick(onSave)}
             >
-              保存
+              保存至本地存储
             </button>
             <button
               type="button"
@@ -35,7 +38,26 @@ function CanvasTopBar({
               role="menuitem"
               onClick={handleMenuItemClick(onLoad)}
             >
-              读取
+              读取本地存储
+            </button>
+
+            <div className="canvas-topbar__menu-divider" role="presentation" />
+            <div className="canvas-topbar__menu-group-label" role="presentation">JSON 文件</div>
+            <button
+              type="button"
+              className="canvas-topbar__menu-item"
+              role="menuitem"
+              onClick={handleMenuItemClick(onExportJson)}
+            >
+              导出为 JSON
+            </button>
+            <button
+              type="button"
+              className="canvas-topbar__menu-item"
+              role="menuitem"
+              onClick={handleMenuItemClick(onImportJson)}
+            >
+              导入 JSON
             </button>
           </div>
         </details>
