@@ -35,6 +35,14 @@ const getSidebarBounds = (viewportWidth) => {
   return { min, max }
 }
 
+const defaultPenSettings = {
+  color: '#1a73e8',
+  width: 3,
+  mode: 'draw',
+  eraserSize: 20,
+  eraserShape: 'circle',
+}
+
 const getNextShapeIdCounter = (shapes) => {
   if (!Array.isArray(shapes) || shapes.length === 0) {
     return 0
@@ -70,6 +78,7 @@ function HomePage() {
     showRuler: false,
     showAlignmentGuides: false,
   })
+  const [penSettings, setPenSettings] = useState(defaultPenSettings)
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
   const [sidebarBounds, setSidebarBounds] = useState({ min: 300, max: 620 })
   const [isCompactLayout, setIsCompactLayout] = useState(false)
@@ -157,6 +166,17 @@ function HomePage() {
     setWorkspaceAssist((previous) => ({
       ...previous,
       [assistKey]: !previous[assistKey],
+    }))
+  }
+
+  const handlePenSettingsChange = (penPatch) => {
+    if (!penPatch || typeof penPatch !== 'object') {
+      return
+    }
+
+    setPenSettings((previous) => ({
+      ...previous,
+      ...penPatch,
     }))
   }
 
@@ -519,6 +539,8 @@ function HomePage() {
           tools={toolItems}
           activeTool={activeTool}
           onSelectTool={setActiveTool}
+          penSettings={penSettings}
+          onPenSettingsChange={handlePenSettingsChange}
           layers={layerItems}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={handleToggleWorkspaceAssist}
@@ -568,6 +590,7 @@ function HomePage() {
             connectionToolMode={connectionToolMode}
             onConnectionToolModeComplete={handleConnectionToolModeComplete}
             activeTool={activeTool}
+            penSettings={penSettings}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}
           />

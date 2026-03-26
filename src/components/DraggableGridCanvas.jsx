@@ -44,6 +44,7 @@ function DraggableGridCanvas({
   onAddShape,
   onShapesChange,
   activeTool,
+  penSettings,
   showRuler,
   showAlignmentGuides,
   onConnectionsChange,
@@ -100,14 +101,18 @@ function DraggableGridCanvas({
   const selectedShapeIdSet = new Set(selectedShapeIds)
   const {
     penStrokes,
+    eraserPreview,
+    isEraserMode,
     startPenStroke,
     appendPenStrokePoint,
     finishPenStroke,
+    handlePenPointerLeave,
   } = usePenStrokes({
     viewport,
     viewportRef,
     getWorldPoint,
     moveThresholdPx: PEN_MOVE_THRESHOLD_PX,
+    penSettings,
   })
   const {
     isConnecting,
@@ -311,11 +316,12 @@ function DraggableGridCanvas({
     <section className="grid-workspace" aria-label="绘图工作区">
       <div
         ref={viewportRef}
-        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''} ${isConnecting ? 'is-connecting' : ''}`}
+        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''} ${isEraserMode ? 'is-eraser' : ''} ${isConnecting ? 'is-connecting' : ''}`}
         onPointerDown={handleViewportPointerDown}
         onPointerMove={handleViewportPointerMove}
         onPointerUp={handleViewportPointerUp}
         onPointerCancel={handleViewportPointerCancel}
+        onPointerLeave={handlePenPointerLeave}
         onWheel={handleWheel}
         onContextMenu={(event) => event.preventDefault()}
         onDragOver={handleDragOver}
@@ -347,6 +353,18 @@ function DraggableGridCanvas({
 
         <div className="grid-workspace__grid" style={gridStyle} />
 
+        {isEraserMode && eraserPreview.visible && (
+          <div
+            className={`grid-workspace__eraser-overlay grid-workspace__eraser-overlay--${penSettings?.eraserShape || 'circle'}`}
+            style={{
+              left: `${eraserPreview.x}px`,
+              top: `${eraserPreview.y}px`,
+              '--eraser-preview-size': `${Math.min(80, Math.max(8, penSettings?.eraserSize || 20))}px`,
+            }}
+            aria-hidden="true"
+          />
+        )}
+
         {alignmentGuideLines.length > 0 && (
           <div className="grid-workspace__guides" aria-hidden="true">
             {alignmentGuideLines.map((line) => (
@@ -368,23 +386,28 @@ function DraggableGridCanvas({
 
               if (stroke.points.length === 1) {
                 const point = worldToScreenPoint(stroke.points[0], viewport)
+                const strokeWidth = typeof stroke.strokeWidth === 'number' ? stroke.strokeWidth : PEN_STROKE_WIDTH
+                const strokeColor = stroke.strokeColor || PEN_STROKE_COLOR
                 return (
                   <circle
                     key={stroke.id}
                     cx={point.x}
                     cy={point.y}
-                    r={PEN_STROKE_WIDTH / 2}
-                    fill={PEN_STROKE_COLOR}
+                    r={strokeWidth / 2}
+                    fill={strokeColor}
                   />
                 )
               }
+
+              const strokeWidth = typeof stroke.strokeWidth === 'number' ? stroke.strokeWidth : PEN_STROKE_WIDTH
+              const strokeColor = stroke.strokeColor || PEN_STROKE_COLOR
 
               return (
                 <path
                   key={stroke.id}
                   d={buildStrokePathData(stroke.points, viewport)}
-                  stroke={PEN_STROKE_COLOR}
-                  strokeWidth={PEN_STROKE_WIDTH}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill="none"

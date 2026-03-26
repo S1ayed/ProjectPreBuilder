@@ -28,6 +28,8 @@ function WorkbenchSidebar({
   tools,
   activeTool,
   onSelectTool,
+  penSettings,
+  onPenSettingsChange,
   layers,
   workspaceAssist,
   onToggleWorkspaceAssist,
@@ -64,6 +66,8 @@ function WorkbenchSidebar({
           tools={tools}
           activeTool={activeTool}
           onSelectTool={onSelectTool}
+          penSettings={penSettings}
+          onPenSettingsChange={onPenSettingsChange}
           layers={layers}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={onToggleWorkspaceAssist}
