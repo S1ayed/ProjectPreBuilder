@@ -35,6 +35,7 @@ import {
 } from './canvas/canvasUtils'
 
 const DIRECTIONAL_CONNECTION_MARKER_ID = 'grid-workspace-connection-arrow'
+const DEFAULT_TEXT_PLACEHOLDER = '点击编辑文字'
 
 function DraggableGridCanvas({
   viewport,
@@ -44,15 +45,19 @@ function DraggableGridCanvas({
   onAddShape,
   onShapesChange,
   activeTool,
+  penSettings,
   showRuler,
   showAlignmentGuides,
   onConnectionsChange,
   onEditSelectedNode,
   connectionToolMode,
   onConnectionToolModeComplete,
+  onSelectionChange,
 }) {
   const viewportRef = useRef(null)
   const [editingConnectionId, setEditingConnectionId] = useState(null)
+  const [editingTextId, setEditingTextId] = useState(null)
+  const [editingTextValue, setEditingTextValue] = useState('')
 
   const isPenTool = activeTool === 'pen'
   const viewportSize = useViewportSize(viewportRef)
@@ -86,6 +91,7 @@ function DraggableGridCanvas({
     handlePointerUp,
     handlePointerCancel,
     handleResizePointerDown,
+    selectShapeById,
   } = useCanvasMouseActions({
     viewport,
     viewportRef,
@@ -98,16 +104,26 @@ function DraggableGridCanvas({
   })
 
   const selectedShapeIdSet = new Set(selectedShapeIds)
+
+  useEffect(() => {
+    if (typeof onSelectionChange === 'function') {
+      onSelectionChange(selectedShapeIds)
+    }
+  }, [selectedShapeIds, onSelectionChange])
   const {
     penStrokes,
+    eraserPreview,
+    isEraserMode,
     startPenStroke,
     appendPenStrokePoint,
     finishPenStroke,
+    handlePenPointerLeave,
   } = usePenStrokes({
     viewport,
     viewportRef,
     getWorldPoint,
     moveThresholdPx: PEN_MOVE_THRESHOLD_PX,
+    penSettings,
   })
   const {
     isConnecting,
@@ -141,6 +157,11 @@ function DraggableGridCanvas({
   })
 
   const handleViewportPointerDown = (event) => {
+    if (editingTextId) {
+      setEditingTextId(null)
+      setEditingTextValue('')
+    }
+
     if (isPenTool && event.button === 0) {
       startPenStroke(event)
       return
@@ -175,6 +196,36 @@ function DraggableGridCanvas({
     }
 
     handlePointerCancel(event)
+  }
+
+  const updateShapeText = (shapeId, text) => {
+    onShapesChange((previousShapes) => previousShapes.map((shape) => {
+      if (shape.id !== shapeId) {
+        return shape
+      }
+
+      return {
+        ...shape,
+        payload: {
+          ...(shape.payload || {}),
+          text,
+        },
+      }
+    }))
+  }
+
+  const startTextEditing = (shapeId, text) => {
+    if (!shapeId) {
+      return
+    }
+
+    setEditingTextId(shapeId)
+    setEditingTextValue(text === DEFAULT_TEXT_PLACEHOLDER ? '' : text)
+  }
+
+  const stopTextEditing = () => {
+    setEditingTextId(null)
+    setEditingTextValue('')
   }
 
   const handleWheel = (event) => {
@@ -311,11 +362,12 @@ function DraggableGridCanvas({
     <section className="grid-workspace" aria-label="绘图工作区">
       <div
         ref={viewportRef}
-        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''} ${isConnecting ? 'is-connecting' : ''}`}
+        className={`grid-workspace__viewport ${isPanning ? 'is-panning' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isPenTool ? 'is-pen' : ''} ${isEraserMode ? 'is-eraser' : ''} ${isConnecting ? 'is-connecting' : ''}`}
         onPointerDown={handleViewportPointerDown}
         onPointerMove={handleViewportPointerMove}
         onPointerUp={handleViewportPointerUp}
         onPointerCancel={handleViewportPointerCancel}
+        onPointerLeave={handlePenPointerLeave}
         onWheel={handleWheel}
         onContextMenu={(event) => event.preventDefault()}
         onDragOver={handleDragOver}
@@ -347,6 +399,18 @@ function DraggableGridCanvas({
 
         <div className="grid-workspace__grid" style={gridStyle} />
 
+        {isEraserMode && eraserPreview.visible && (
+          <div
+            className={`grid-workspace__eraser-overlay grid-workspace__eraser-overlay--${penSettings?.eraserShape || 'circle'}`}
+            style={{
+              left: `${eraserPreview.x}px`,
+              top: `${eraserPreview.y}px`,
+              '--eraser-preview-size': `${Math.min(80, Math.max(8, penSettings?.eraserSize || 20))}px`,
+            }}
+            aria-hidden="true"
+          />
+        )}
+
         {alignmentGuideLines.length > 0 && (
           <div className="grid-workspace__guides" aria-hidden="true">
             {alignmentGuideLines.map((line) => (
@@ -368,23 +432,28 @@ function DraggableGridCanvas({
 
               if (stroke.points.length === 1) {
                 const point = worldToScreenPoint(stroke.points[0], viewport)
+                const strokeWidth = typeof stroke.strokeWidth === 'number' ? stroke.strokeWidth : PEN_STROKE_WIDTH
+                const strokeColor = stroke.strokeColor || PEN_STROKE_COLOR
                 return (
                   <circle
                     key={stroke.id}
                     cx={point.x}
                     cy={point.y}
-                    r={PEN_STROKE_WIDTH / 2}
-                    fill={PEN_STROKE_COLOR}
+                    r={strokeWidth / 2}
+                    fill={strokeColor}
                   />
                 )
               }
+
+              const strokeWidth = typeof stroke.strokeWidth === 'number' ? stroke.strokeWidth : PEN_STROKE_WIDTH
+              const strokeColor = stroke.strokeColor || PEN_STROKE_COLOR
 
               return (
                 <path
                   key={stroke.id}
                   d={buildStrokePathData(stroke.points, viewport)}
-                  stroke={PEN_STROKE_COLOR}
-                  strokeWidth={PEN_STROKE_WIDTH}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   fill="none"
@@ -453,8 +522,12 @@ function DraggableGridCanvas({
             const isSelected = selectedShapeIdSet.has(shape.id)
             const visualStyle = getShapeVisualStyle(shape)
             const shapeKind = getKindByShapeType(shape.type)
+            const isTextShape = shape.type === 'text'
             const shapeFileName = typeof shape?.payload?.FileName === 'string' ? shape.payload.FileName.trim() : ''
-            const showFileNameLabel = shapeKind === 'file' && shapeFileName && shapeFileName !== DEFAULT_FILE_NAME
+            const rawTextValue = typeof shape?.payload?.text === 'string' ? shape.payload.text : ''
+            const textValue = rawTextValue.trim() ? rawTextValue : DEFAULT_TEXT_PLACEHOLDER
+            const textFontSize = Number.isFinite(shape?.payload?.fontSize) ? shape.payload.fontSize : 14
+            const showFileNameLabel = !isTextShape && shapeKind === 'file' && shapeFileName && shapeFileName !== DEFAULT_FILE_NAME
             const canResizeShape = isShapeResizable(shape.type)
             return (
               <div
@@ -470,12 +543,55 @@ function DraggableGridCanvas({
                 <div
                   className={`canvas-shape__body canvas-shape__body--${shape.type}`}
                   style={{
-                    backgroundColor: visualStyle.fillColor,
-                    borderColor: visualStyle.strokeColor,
+                    backgroundColor: isTextShape && !isSelected ? 'transparent' : visualStyle.fillColor,
+                    borderColor: isTextShape && !isSelected ? 'transparent' : visualStyle.strokeColor,
                     borderWidth: `${Math.max(1, visualStyle.strokeWidth)}px`,
                     opacity: clamp(visualStyle.opacity, 0.2, 1),
                   }}
                 />
+
+                {isTextShape && editingTextId !== shape.id && (
+                  <div
+                    className="canvas-shape__text"
+                    style={{
+                      fontSize: `${Math.max(10, textFontSize * viewport.zoom)}px`,
+                      color: visualStyle.strokeColor,
+                    }}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) {
+                        return
+                      }
+
+                      event.preventDefault()
+                      event.stopPropagation()
+                      selectShapeById(shape.id)
+                      startTextEditing(shape.id, textValue)
+                    }}
+                  >
+                    {textValue}
+                  </div>
+                )}
+
+                {isTextShape && editingTextId === shape.id && (
+                  <textarea
+                    className="canvas-shape__text-editor"
+                    value={editingTextValue}
+                    autoFocus
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      const nextText = event.target.value
+                      setEditingTextValue(nextText)
+                      updateShapeText(shape.id, nextText)
+                    }}
+                    onBlur={stopTextEditing}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        stopTextEditing()
+                      }
+                    }}
+                  />
+                )}
 
                 {showFileNameLabel && <span className="canvas-shape__name">{shapeFileName}</span>}
 

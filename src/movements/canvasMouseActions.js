@@ -17,6 +17,7 @@ const isPointInsideRect = (point, rect) => (
 )
 
 const mergeUniqueIds = (baseIds, incomingIds) => Array.from(new Set([...baseIds, ...incomingIds]))
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 const findTopShapeAtPoint = (point, shapeList, getShapeBoundsWorld) => {
   for (let index = shapeList.length - 1; index >= 0; index -= 1) {
@@ -233,10 +234,25 @@ export function useCanvasMouseActions({
     if (interaction.mode === 'resize-shape') {
       const worldPoint = getWorldPoint(event, event.currentTarget, viewport)
       const shapePatch = getResizedShapePatch({ interaction, worldPoint })
+      const widthScale = shapePatch.width / Math.max(1, interaction.baseShape.width)
+      const heightScale = shapePatch.height / Math.max(1, interaction.baseShape.height)
+      const scaleRatio = Math.sqrt(widthScale * heightScale)
 
       onShapesChange((previousShapes) => previousShapes.map((shape) => {
         if (shape.id !== interaction.shapeId) {
           return shape
+        }
+
+        if (interaction.shapeType === 'text') {
+          const nextFontSize = clamp(interaction.baseTextFontSize * scaleRatio, 10, 180)
+          return {
+            ...shape,
+            ...shapePatch,
+            payload: {
+              ...(shape.payload || {}),
+              fontSize: Math.round(nextFontSize * 10) / 10,
+            },
+          }
         }
 
         return {
@@ -286,6 +302,8 @@ export function useCanvasMouseActions({
     startCapturedInteraction(event, {
       mode: 'resize-shape',
       shapeId: shape.id,
+      shapeType: shape.type,
+      baseTextFontSize: Number.isFinite(shape?.payload?.fontSize) ? shape.payload.fontSize : 14,
       startWorld: getWorldPoint(event, viewportRef.current, viewport),
       baseShape: {
         x: shape.x,
@@ -307,5 +325,13 @@ export function useCanvasMouseActions({
     handlePointerUp,
     handlePointerCancel,
     handleResizePointerDown,
+    selectShapeById: (shapeId) => {
+      if (!shapeId) {
+        return
+      }
+
+      setSelectedShapeIds([shapeId])
+      setShowSelectionToolbar(false)
+    },
   }
 }

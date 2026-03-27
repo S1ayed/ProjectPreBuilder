@@ -1,6 +1,6 @@
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-export const supportedShapeTypes = new Set(['rect', 'oval', 'diamond', 'parallelogram'])
+export const supportedShapeTypes = new Set(['rect', 'oval', 'diamond', 'parallelogram', 'text'])
 export const PEN_STROKE_COLOR = '#1a73e8'
 export const PEN_STROKE_WIDTH = 2.6
 export const PEN_MOVE_THRESHOLD_PX = 2
@@ -12,6 +12,7 @@ export const defaultShapeSizes = {
   oval: { width: 128, height: 88 },
   parallelogram: { width: 140, height: 86 },
   diamond: { width: 108, height: 108 },
+  text: { width: 200, height: 64 },
 }
 
 export const defaultShapeStyles = {

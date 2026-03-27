@@ -34,6 +34,14 @@ const getSidebarBounds = (viewportWidth) => {
   return { min, max }
 }
 
+const defaultPenSettings = {
+  color: '#1a73e8',
+  width: 3,
+  mode: 'draw',
+  eraserSize: 20,
+  eraserShape: 'circle',
+}
+
 const getNextShapeIdCounter = (shapes) => {
   if (!Array.isArray(shapes) || shapes.length === 0) {
     return 0
@@ -65,10 +73,12 @@ function HomePage() {
   const [canvasConnections, setCanvasConnections] = useState([])
   const [connectionToolMode, setConnectionToolMode] = useState(null)
   const [editingNodeId, setEditingNodeId] = useState(null)
+  const [selectedShapeIds, setSelectedShapeIds] = useState([])
   const [workspaceAssist, setWorkspaceAssist] = useState({
     showRuler: false,
     showAlignmentGuides: false,
   })
+  const [penSettings, setPenSettings] = useState(defaultPenSettings)
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
   const [sidebarBounds, setSidebarBounds] = useState({ min: 300, max: 620 })
   const [isCompactLayout, setIsCompactLayout] = useState(false)
@@ -148,7 +158,9 @@ function HomePage() {
     const shapeSize = getShapeDefaultSize(shapeType)
     const shapeStyle = getShapeDefaultStyle(shapeType)
     const kind = getKindByShapeType(shapeType)
-    const payload = getDefaultNodePayload(kind)
+    const payload = shapeType === 'text'
+      ? { text: '点击编辑文字', fontSize: 14 }
+      : getDefaultNodePayload(kind)
 
     const nextShape = {
       id: `shape-${shapeIdRef.current}`,
@@ -167,6 +179,29 @@ function HomePage() {
 
     shapeIdRef.current += 1
     setCanvasShapes((previous) => [...previous, nextShape])
+    return nextShape.id
+  }
+
+  const selectedTextShape = canvasShapes.find((shape) => shape.id === selectedShapeIds[0] && shape.type === 'text') || null
+
+  const handleSelectedTextChange = (nextText) => {
+    if (!selectedTextShape) {
+      return
+    }
+
+    setCanvasShapes((previousShapes) => previousShapes.map((shape) => {
+      if (shape.id !== selectedTextShape.id) {
+        return shape
+      }
+
+      return {
+        ...shape,
+        payload: {
+          ...(shape.payload || {}),
+          text: nextText,
+        },
+      }
+    }))
   }
 
   const handleToggleWorkspaceAssist = (assistKey) => {
@@ -177,6 +212,17 @@ function HomePage() {
     setWorkspaceAssist((previous) => ({
       ...previous,
       [assistKey]: !previous[assistKey],
+    }))
+  }
+
+  const handlePenSettingsChange = (penPatch) => {
+    if (!penPatch || typeof penPatch !== 'object') {
+      return
+    }
+
+    setPenSettings((previous) => ({
+      ...previous,
+      ...penPatch,
     }))
   }
 
@@ -321,11 +367,15 @@ function HomePage() {
           tools={toolItems}
           activeTool={activeTool}
           onSelectTool={setActiveTool}
+          penSettings={penSettings}
+          onPenSettingsChange={handlePenSettingsChange}
           layers={layerItems}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={handleToggleWorkspaceAssist}
           activeConnectionTool={connectionToolMode}
           onSelectConnectionTool={handleSelectConnectionTool}
+          selectedTextShape={selectedTextShape}
+          onSelectedTextChange={handleSelectedTextChange}
         />
 
         {!isCompactLayout && (
@@ -370,8 +420,10 @@ function HomePage() {
             connectionToolMode={connectionToolMode}
             onConnectionToolModeComplete={handleConnectionToolModeComplete}
             activeTool={activeTool}
+            penSettings={penSettings}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}
+            onSelectionChange={setSelectedShapeIds}
           />
         </main>
       </div>

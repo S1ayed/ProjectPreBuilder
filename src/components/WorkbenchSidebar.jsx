@@ -28,11 +28,15 @@ function WorkbenchSidebar({
   tools,
   activeTool,
   onSelectTool,
+  penSettings,
+  onPenSettingsChange,
   layers,
   workspaceAssist,
   onToggleWorkspaceAssist,
   activeConnectionTool,
   onSelectConnectionTool,
+  selectedTextShape,
+  onSelectedTextChange,
 }) {
   const [activeSection, setActiveSection] = useState('template')
   const ActiveSectionComponent = sectionComponentMap[activeSection] || TemplateSection
@@ -64,11 +68,15 @@ function WorkbenchSidebar({
           tools={tools}
           activeTool={activeTool}
           onSelectTool={onSelectTool}
+          penSettings={penSettings}
+          onPenSettingsChange={onPenSettingsChange}
           layers={layers}
           workspaceAssist={workspaceAssist}
           onToggleWorkspaceAssist={onToggleWorkspaceAssist}
           activeConnectionTool={activeConnectionTool}
           onSelectConnectionTool={onSelectConnectionTool}
+          selectedTextShape={selectedTextShape}
+          onSelectedTextChange={onSelectedTextChange}
         />
       </div>
     </aside>

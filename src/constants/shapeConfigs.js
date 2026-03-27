@@ -43,6 +43,17 @@ const SHAPE_CONFIGS = {
       opacity: 1,
     },
   },
+  text: {
+    nodeKind: 'file',
+    resizable: true,
+    defaultSize: { width: 200, height: 64 },
+    defaultStyle: {
+      fillColor: '#ffffff',
+      strokeColor: '#164488',
+      strokeWidth: 2,
+      opacity: 1,
+    },
+  },
 }
 
 const FALLBACK_SHAPE_TYPE = 'rect'
