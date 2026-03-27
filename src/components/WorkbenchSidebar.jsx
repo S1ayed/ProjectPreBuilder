@@ -35,6 +35,8 @@ function WorkbenchSidebar({
   onToggleWorkspaceAssist,
   activeConnectionTool,
   onSelectConnectionTool,
+  selectedTextShape,
+  onSelectedTextChange,
 }) {
   const [activeSection, setActiveSection] = useState('template')
   const ActiveSectionComponent = sectionComponentMap[activeSection] || TemplateSection
@@ -73,6 +75,8 @@ function WorkbenchSidebar({
           onToggleWorkspaceAssist={onToggleWorkspaceAssist}
           activeConnectionTool={activeConnectionTool}
           onSelectConnectionTool={onSelectConnectionTool}
+          selectedTextShape={selectedTextShape}
+          onSelectedTextChange={onSelectedTextChange}
         />
       </div>
     </aside>

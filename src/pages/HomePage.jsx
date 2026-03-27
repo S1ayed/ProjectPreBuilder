@@ -74,6 +74,7 @@ function HomePage() {
   const [canvasConnections, setCanvasConnections] = useState([])
   const [connectionToolMode, setConnectionToolMode] = useState(null)
   const [editingNodeId, setEditingNodeId] = useState(null)
+  const [selectedShapeIds, setSelectedShapeIds] = useState([])
   const [workspaceAssist, setWorkspaceAssist] = useState({
     showRuler: false,
     showAlignmentGuides: false,
@@ -137,7 +138,9 @@ function HomePage() {
     const shapeSize = getShapeDefaultSize(shapeType)
     const shapeStyle = getShapeDefaultStyle(shapeType)
     const kind = getKindByShapeType(shapeType)
-    const payload = getDefaultNodePayload(kind)
+    const payload = shapeType === 'text'
+      ? { text: '点击编辑文字', fontSize: 14 }
+      : getDefaultNodePayload(kind)
 
     const nextShape = {
       id: `shape-${shapeIdRef.current}`,
@@ -156,6 +159,29 @@ function HomePage() {
 
     shapeIdRef.current += 1
     setCanvasShapes((previous) => [...previous, nextShape])
+    return nextShape.id
+  }
+
+  const selectedTextShape = canvasShapes.find((shape) => shape.id === selectedShapeIds[0] && shape.type === 'text') || null
+
+  const handleSelectedTextChange = (nextText) => {
+    if (!selectedTextShape) {
+      return
+    }
+
+    setCanvasShapes((previousShapes) => previousShapes.map((shape) => {
+      if (shape.id !== selectedTextShape.id) {
+        return shape
+      }
+
+      return {
+        ...shape,
+        payload: {
+          ...(shape.payload || {}),
+          text: nextText,
+        },
+      }
+    }))
   }
 
   const handleToggleWorkspaceAssist = (assistKey) => {
@@ -546,6 +572,8 @@ function HomePage() {
           onToggleWorkspaceAssist={handleToggleWorkspaceAssist}
           activeConnectionTool={connectionToolMode}
           onSelectConnectionTool={handleSelectConnectionTool}
+          selectedTextShape={selectedTextShape}
+          onSelectedTextChange={handleSelectedTextChange}
         />
 
         {!isCompactLayout && (
@@ -593,6 +621,7 @@ function HomePage() {
             penSettings={penSettings}
             showRuler={workspaceAssist.showRuler}
             showAlignmentGuides={workspaceAssist.showAlignmentGuides}
+            onSelectionChange={setSelectedShapeIds}
           />
         </main>
       </div>

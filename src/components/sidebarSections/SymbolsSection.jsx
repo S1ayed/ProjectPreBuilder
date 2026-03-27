@@ -6,6 +6,7 @@ const eraserShapes = [
   { id: 'diamond', name: '菱形' },
 ]
 const eraserPresetSizes = [12, 20, 28, 36]
+const DEFAULT_TEXT_PLACEHOLDER = '点击编辑文字'
 const eraserPresets = eraserPresetSizes.flatMap((size) => (
   eraserShapes.map((shape) => ({
     id: `${shape.id}-${size}`,
@@ -103,10 +104,28 @@ const hslToHex = (h, s, l) => {
   return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`
 }
 
-function SymbolsSection({ tools, activeTool, onSelectTool, penSettings, onPenSettingsChange }) {
+function SymbolsSection({
+  tools,
+  activeTool,
+  onSelectTool,
+  penSettings,
+  onPenSettingsChange,
+  selectedTextShape,
+  onSelectedTextChange,
+}) {
   const isPenActive = activeTool === 'pen'
+  const isTextActive = activeTool === 'text'
   const activeColor = penSettings?.color || '#1a73e8'
   const activeHue = getHueFromHexColor(activeColor)
+  const selectedTextRaw = typeof selectedTextShape?.payload?.text === 'string' ? selectedTextShape.payload.text : ''
+  const selectedTextDisplay = selectedTextRaw.trim() ? selectedTextRaw : DEFAULT_TEXT_PLACEHOLDER
+
+  const handleTextDragStart = (event) => {
+    event.dataTransfer.effectAllowed = 'copy'
+    event.dataTransfer.setData('application/x-workbench-shape', 'text')
+    event.dataTransfer.setData('application/json', JSON.stringify({ shapeType: 'text' }))
+    event.dataTransfer.setData('text/plain', 'text')
+  }
 
   return (
     <>
@@ -136,6 +155,40 @@ function SymbolsSection({ tools, activeTool, onSelectTool, penSettings, onPenSet
           )
         })}
       </ul>
+
+      {isTextActive && (
+        <section className="workbench-sidebar__text-panel" aria-label="文本框工具">
+          <h4 className="workbench-sidebar__text-title">文本框</h4>
+          <button
+            type="button"
+            className="workbench-sidebar__text-drag-btn"
+            draggable
+            onDragStart={handleTextDragStart}
+            title="按住拖拽到视图中"
+          >
+            <span className="workbench-sidebar__text-drag-icon" aria-hidden="true">T</span>
+            <span>拖拽到视图中</span>
+          </button>
+
+          <div className="workbench-sidebar__text-editor-panel">
+            <label className="workbench-sidebar__text-label" htmlFor="sidebar-text-editor">文本内容</label>
+            <textarea
+              id="sidebar-text-editor"
+              className="workbench-sidebar__text-editor"
+              rows={5}
+              placeholder="先在画布中选择一个文本框"
+              disabled={!selectedTextShape}
+              value={selectedTextDisplay}
+              onFocus={() => {
+                if (selectedTextDisplay === DEFAULT_TEXT_PLACEHOLDER) {
+                  onSelectedTextChange?.('')
+                }
+              }}
+              onChange={(event) => onSelectedTextChange?.(event.target.value)}
+            />
+          </div>
+        </section>
+      )}
 
       {isPenActive && (
         <section className="workbench-sidebar__pen-panel" aria-label="画笔设置">
