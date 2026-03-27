@@ -142,3 +142,5 @@ vite.config.ts.timestamp-*
 docs/info
 docs/todoList
 prebuild/*
+skills/
+skill/
