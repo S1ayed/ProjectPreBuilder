@@ -6,6 +6,101 @@ export const PEN_STROKE_WIDTH = 2.6
 export const PEN_MOVE_THRESHOLD_PX = 2
 export const CONNECTOR_STROKE_COLOR = '#2f5b8a'
 export const CONNECTOR_STROKE_WIDTH = 2
+export const TEXT_SHAPE_CONTENT_INSET = 8
+export const TEXT_SHAPE_LINE_HEIGHT_RATIO = 1.38
+
+const TEXT_MEASURE_FONT_FAMILY = "'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+let sharedTextMeasureContext = null
+
+const getSharedTextMeasureContext = () => {
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  if (sharedTextMeasureContext) {
+    return sharedTextMeasureContext
+  }
+
+  const canvas = document.createElement('canvas')
+  sharedTextMeasureContext = canvas.getContext('2d')
+  return sharedTextMeasureContext
+}
+
+const measureTextLineWidth = (lineText, fontSize) => {
+  const context = getSharedTextMeasureContext()
+  const safeText = lineText.length > 0 ? lineText : ' '
+
+  if (!context) {
+    return safeText.length * fontSize * 0.6
+  }
+
+  context.font = `${fontSize}px ${TEXT_MEASURE_FONT_FAMILY}`
+  return context.measureText(safeText).width
+}
+
+const getTextLayoutExtraWidth = (lineText, fontSize) => {
+  const charCount = Math.max(0, Array.from(lineText).length - 1)
+  const letterSpacingWidth = charCount * fontSize * 0.01
+  return letterSpacingWidth + 2
+}
+
+const splitWrappedLineByWidth = (lineText, fontSize, maxContentWidth) => {
+  const safeLineText = lineText.length > 0 ? lineText : ' '
+  const safeMaxWidth = Math.max(fontSize, maxContentWidth)
+  const wrappedLines = []
+  let currentLine = ''
+
+  for (const character of Array.from(safeLineText)) {
+    const nextLine = `${currentLine}${character}`
+    const nextWidth = measureTextLineWidth(nextLine, fontSize) + getTextLayoutExtraWidth(nextLine, fontSize)
+
+    if (currentLine && nextWidth > safeMaxWidth) {
+      wrappedLines.push(currentLine)
+      currentLine = character
+      continue
+    }
+
+    currentLine = nextLine
+  }
+
+  wrappedLines.push(currentLine || ' ')
+  return wrappedLines
+}
+
+export const getAutoSizedTextShapeSize = ({
+  text,
+  fontSize = 14,
+  placeholder = '',
+  preferredWidth,
+}) => {
+  const normalizedText = typeof text === 'string' ? text : ''
+  const effectiveText = normalizedText.trim().length > 0
+    ? normalizedText
+    : (placeholder || '字')
+  const lines = effectiveText.split('\n')
+  const safeFontSize = clamp(Number.isFinite(fontSize) ? fontSize : 14, 10, 180)
+  const lineHeight = safeFontSize * TEXT_SHAPE_LINE_HEIGHT_RATIO
+  const preferredContentWidth = Number.isFinite(preferredWidth)
+    ? preferredWidth - TEXT_SHAPE_CONTENT_INSET * 2
+    : NaN
+  const hasPreferredWidth = Number.isFinite(preferredContentWidth) && preferredContentWidth > 0
+  const measuredContentWidth = Math.max(
+    safeFontSize,
+    ...lines.map((line) => measureTextLineWidth(line, safeFontSize) + getTextLayoutExtraWidth(line, safeFontSize)),
+  )
+  const contentWidth = hasPreferredWidth
+    ? Math.max(safeFontSize, preferredContentWidth)
+    : measuredContentWidth
+  const wrappedLines = hasPreferredWidth
+    ? lines.flatMap((line) => splitWrappedLineByWidth(line, safeFontSize, contentWidth))
+    : lines
+  const contentHeight = Math.max(lineHeight, wrappedLines.length * lineHeight)
+
+  return {
+    width: Math.ceil((hasPreferredWidth ? contentWidth : measuredContentWidth) + TEXT_SHAPE_CONTENT_INSET * 2),
+    height: Math.ceil(contentHeight + TEXT_SHAPE_CONTENT_INSET * 2),
+  }
+}
 
 export const defaultShapeSizes = {
   rect: { width: 120, height: 86 },

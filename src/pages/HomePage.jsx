@@ -18,6 +18,7 @@ import {
   getZoomInViewport,
   getZoomOutViewport,
 } from '../movements/zooming'
+import { getAutoSizedTextShapeSize } from '../components/canvas/canvasUtils'
 import {
   buildSnapshotFromState,
   loadSnapshotFromLocalStorage,
@@ -141,6 +142,13 @@ function HomePage() {
     const payload = shapeType === 'text'
       ? { text: '点击编辑文字', fontSize: 14 }
       : getDefaultNodePayload(kind)
+    const autoSizedText = shapeType === 'text'
+      ? getAutoSizedTextShapeSize({
+        text: payload.text,
+        fontSize: payload.fontSize,
+        placeholder: '点击编辑文字',
+      })
+      : null
 
     const nextShape = {
       id: `shape-${shapeIdRef.current}`,
@@ -149,8 +157,8 @@ function HomePage() {
       payload,
       x: position.x,
       y: position.y,
-      width: shapeSize.width,
-      height: shapeSize.height,
+      width: autoSizedText ? autoSizedText.width : shapeSize.width,
+      height: autoSizedText ? autoSizedText.height : shapeSize.height,
       fillColor: shapeStyle.fillColor,
       strokeColor: shapeStyle.strokeColor,
       strokeWidth: shapeStyle.strokeWidth,
@@ -174,8 +182,18 @@ function HomePage() {
         return shape
       }
 
+      const fontSize = Number.isFinite(shape?.payload?.fontSize) ? shape.payload.fontSize : 14
+      const nextTextSize = getAutoSizedTextShapeSize({
+        text: nextText,
+        fontSize,
+        placeholder: '点击编辑文字',
+        preferredWidth: shape.width,
+      })
+
       return {
         ...shape,
+        width: nextTextSize.width,
+        height: nextTextSize.height,
         payload: {
           ...(shape.payload || {}),
           text: nextText,

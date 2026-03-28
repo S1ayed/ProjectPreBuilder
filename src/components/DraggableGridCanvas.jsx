@@ -27,6 +27,7 @@ import {
   getShapeScreenPosition,
   getShapeSize,
   getShapeVisualStyle,
+  getAutoSizedTextShapeSize,
   getWorldPoint,
   PEN_MOVE_THRESHOLD_PX,
   PEN_STROKE_COLOR,
@@ -204,8 +205,18 @@ function DraggableGridCanvas({
         return shape
       }
 
+      const nextFontSize = Number.isFinite(shape?.payload?.fontSize) ? shape.payload.fontSize : 14
+      const nextTextSize = getAutoSizedTextShapeSize({
+        text,
+        fontSize: nextFontSize,
+        placeholder: DEFAULT_TEXT_PLACEHOLDER,
+        preferredWidth: shape.width,
+      })
+
       return {
         ...shape,
+        width: nextTextSize.width,
+        height: nextTextSize.height,
         payload: {
           ...(shape.payload || {}),
           text,
@@ -527,6 +538,7 @@ function DraggableGridCanvas({
             const rawTextValue = typeof shape?.payload?.text === 'string' ? shape.payload.text : ''
             const textValue = rawTextValue.trim() ? rawTextValue : DEFAULT_TEXT_PLACEHOLDER
             const textFontSize = Number.isFinite(shape?.payload?.fontSize) ? shape.payload.fontSize : 14
+            const scaledTextFontSize = Math.max(1, textFontSize * viewport.zoom)
             const showFileNameLabel = !isTextShape && shapeKind === 'file' && shapeFileName && shapeFileName !== DEFAULT_FILE_NAME
             const canResizeShape = isShapeResizable(shape.type)
             return (
@@ -554,7 +566,7 @@ function DraggableGridCanvas({
                   <div
                     className="canvas-shape__text"
                     style={{
-                      fontSize: `${Math.max(10, textFontSize * viewport.zoom)}px`,
+                      fontSize: `${scaledTextFontSize}px`,
                       color: visualStyle.strokeColor,
                     }}
                     onPointerDown={(event) => {
@@ -575,6 +587,10 @@ function DraggableGridCanvas({
                 {isTextShape && editingTextId === shape.id && (
                   <textarea
                     className="canvas-shape__text-editor"
+                    style={{
+                      fontSize: `${scaledTextFontSize}px`,
+                      color: visualStyle.strokeColor,
+                    }}
                     value={editingTextValue}
                     autoFocus
                     onPointerDown={(event) => event.stopPropagation()}
