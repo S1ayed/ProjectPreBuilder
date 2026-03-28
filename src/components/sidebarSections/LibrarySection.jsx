@@ -4,9 +4,15 @@ const shapeItems = [
   { id: 'parallelogram', previewClass: 'shape-preview shape-preview--parallelogram', label: '平行四边形' },
   { id: 'diamond', previewClass: 'shape-preview shape-preview--diamond', label: '菱形' },
   {
+    id: 'line',
+    previewClass: 'shape-preview shape-preview--line',
+    label: '无向连接',
+    connectionMode: 'contains',
+  },
+  {
     id: 'arrow-line',
     previewClass: 'shape-preview shape-preview--arrow-line',
-    label: '带箭头直线',
+    label: '依赖连接',
     connectionMode: 'depends_on',
   },
 ]
@@ -56,7 +62,7 @@ function LibrarySection({ activeConnectionTool, onSelectConnectionTool }) {
       </div>
 
       <div className="workbench-sidebar__library-group">
-        <h4 className="workbench-sidebar__library-group-title">依赖连接</h4>
+        <h4 className="workbench-sidebar__library-group-title">连接</h4>
         <div className="workbench-sidebar__favorites workbench-sidebar__favorites--relations">
           {connectionItems.map(renderShapeCard)}
         </div>

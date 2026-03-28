@@ -300,6 +300,13 @@
   position: relative;
 }
 
+.shape-preview--line {
+  width: 40px;
+  height: 10px;
+  border: none;
+  border-top: 2px solid #5a6a85;
+}
+
 .shape-preview--arrow-line::after {
   content: '';
   position: absolute;

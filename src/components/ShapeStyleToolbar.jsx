@@ -8,9 +8,6 @@ function ShapeStyleToolbar({
   onStrokeColorChange,
   onStrokeWidthChange,
   onOpacityChange,
-  onConnectSelected,
-  canConnectSelected,
-  isConnectMode,
   onToolbarOffsetDelta,
   onApplyPreset,
   onEditSelected,
@@ -203,16 +200,6 @@ function ShapeStyleToolbar({
           onChange={(event) => onOpacityChange(Number(event.target.value) / 100)}
         />
       </div>
-
-      <button
-        type="button"
-        className={`shape-style-toolbar__connect ${isConnectMode ? 'is-active' : ''}`}
-        onClick={onConnectSelected}
-        disabled={!canConnectSelected}
-        aria-label="连接选中图形"
-      >
-        连接
-      </button>
 
       <button
         type="button"

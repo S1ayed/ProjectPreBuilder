@@ -127,8 +127,6 @@ function DraggableGridCanvas({
   })
   const {
     isConnecting,
-    canToggleConnectionMode,
-    toggleConnectionMode,
     tryHandleConnectionPointerDown,
     removeConnectionsByShapeIds,
     updateConnectionById,
@@ -139,7 +137,6 @@ function DraggableGridCanvas({
     shapes,
     connections,
     onConnectionsChange,
-    selectedShapeIds,
     isPenTool,
     viewport,
     connectionToolMode,
@@ -383,9 +380,6 @@ function DraggableGridCanvas({
             onStrokeColorChange={(strokeColor) => applyStylePatchToSelection({ strokeColor })}
             onStrokeWidthChange={(strokeWidth) => applyStylePatchToSelection({ strokeWidth })}
             onOpacityChange={(opacity) => applyStylePatchToSelection({ opacity })}
-            onConnectSelected={toggleConnectionMode}
-            canConnectSelected={canToggleConnectionMode}
-            isConnectMode={isConnecting}
             onToolbarOffsetDelta={onToolbarOffsetDelta}
             onApplyPreset={(preset) => {
               const presetPatch = getShapeStylePresetPatch(preset)
