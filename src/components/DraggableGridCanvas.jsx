@@ -56,6 +56,7 @@ function DraggableGridCanvas({
 }) {
   const viewportRef = useRef(null)
   const [editingConnectionId, setEditingConnectionId] = useState(null)
+  const [hoveredDirectionalConnectionId, setHoveredDirectionalConnectionId] = useState(null)
   const [editingTextId, setEditingTextId] = useState(null)
   const [editingTextValue, setEditingTextValue] = useState('')
 
@@ -489,20 +490,52 @@ function DraggableGridCanvas({
                   markerEnd={segment.relationKind === 'depends_on' ? `url(#${DIRECTIONAL_CONNECTION_MARKER_ID})` : undefined}
                 />
                 {segment.relationKind === 'depends_on' && (
-                  <line
-                    className="grid-workspace__connection-hitline"
-                    x1={segment.start.x}
-                    y1={segment.start.y}
-                    x2={segment.end.x}
-                    y2={segment.end.y}
-                    stroke="transparent"
-                    strokeWidth={14}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation()
-                      setEditingConnectionId(segment.id)
-                    }}
-                  />
+                  <g
+                    className="grid-workspace__directional-connection-interaction"
+                    onPointerEnter={() => setHoveredDirectionalConnectionId(segment.id)}
+                    onPointerLeave={() => setHoveredDirectionalConnectionId((previous) => (
+                      previous === segment.id ? null : previous
+                    ))}
+                  >
+                    <line
+                      className="grid-workspace__connection-hitline"
+                      x1={segment.start.x}
+                      y1={segment.start.y}
+                      x2={segment.end.x}
+                      y2={segment.end.y}
+                      stroke="transparent"
+                      strokeWidth={14}
+                      onPointerDown={(event) => event.stopPropagation()}
+                    />
+
+                    {hoveredDirectionalConnectionId === segment.id && (
+                      <g
+                        className="grid-workspace__connection-entry"
+                        transform={`translate(${(segment.start.x + segment.end.x) / 2} ${(segment.start.y + segment.end.y) / 2})`}
+                        role="button"
+                        aria-label="打开依赖链接详情"
+                        tabIndex={0}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setEditingConnectionId(segment.id)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') {
+                            return
+                          }
+
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setEditingConnectionId(segment.id)
+                        }}
+                      >
+                        <circle r="9" />
+                        <line x1="-3.5" y1="0" x2="3.5" y2="0" />
+                        <line x1="0" y1="-3.5" x2="0" y2="3.5" />
+                      </g>
+                    )}
+                  </g>
                 )}
               </g>
             ))}

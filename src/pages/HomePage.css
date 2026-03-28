@@ -959,6 +959,34 @@
   cursor: pointer;
 }
 
+.grid-workspace__directional-connection-interaction {
+  pointer-events: all;
+}
+
+.grid-workspace__connection-entry {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.grid-workspace__connection-entry circle {
+  fill: #ffffff;
+  stroke: #345f95;
+  stroke-width: 1.8;
+  filter: drop-shadow(0 1px 3px rgba(17, 33, 54, 0.28));
+}
+
+.grid-workspace__connection-entry line {
+  stroke: #345f95;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.grid-workspace__connection-entry:hover circle,
+.grid-workspace__connection-entry:focus-visible circle {
+  fill: #eef5ff;
+  stroke: #1f4d89;
+}
+
 .grid-workspace__guide-line {
   position: absolute;
   pointer-events: none;
