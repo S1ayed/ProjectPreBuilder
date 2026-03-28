@@ -6,6 +6,10 @@ import {
   getWorldPoint,
   worldToScreenPoint,
 } from '../components/canvas/canvasUtils'
+import {
+  normalizeConnection,
+  isConnectionValid,
+} from '../interpreter/normalizers/connectionNormalizer'
 
 export function useShapeConnections({
   shapes,
@@ -26,27 +30,9 @@ export function useShapeConnections({
     }
 
     return connections
-      .filter((connection) => connection && typeof connection === 'object')
-      .map((connection) => {
-        const relationKind = connection.relationKind === 'depends_on' ? 'depends_on' : 'contains'
-        return {
-          id: typeof connection.id === 'string' ? connection.id : '',
-          fromShapeId: typeof connection.fromShapeId === 'string' ? connection.fromShapeId : connection.from,
-          toShapeId: typeof connection.toShapeId === 'string' ? connection.toShapeId : connection.to,
-          relationKind,
-          dependencyType: relationKind === 'depends_on'
-            ? (typeof connection.dependencyType === 'string' && connection.dependencyType.trim()
-              ? connection.dependencyType.trim()
-              : 'depends_on')
-            : null,
-        }
-      })
-      .filter((connection) => (
-        connection.id
-        && connection.fromShapeId
-        && connection.toShapeId
-        && connection.fromShapeId !== connection.toShapeId
-      ))
+      .map(normalizeConnection)
+      .filter(Boolean)
+      .filter(isConnectionValid)
   }, [connections])
 
   const isDirectionalConnectionToolActive = connectionToolMode === 'depends_on' && !isPenTool
