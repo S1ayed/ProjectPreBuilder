@@ -1,0 +1,134 @@
+.shape-style-toolbar {
+  position: absolute;
+  z-index: 6;
+  transform: translateX(-50%) translateY(-100%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 20px 10px 8px;
+  border: 1px solid #d6dde7;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(17, 30, 43, 0.14);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.shape-style-toolbar * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.shape-style-toolbar.is-blank-hover,
+.shape-style-toolbar.is-dragging {
+  cursor: all-scroll;
+}
+
+.shape-style-toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  border-right: 1px solid #ebeff3;
+}
+
+.shape-style-toolbar__group--stretch {
+  min-width: 130px;
+  padding-right: 0;
+  border-right: none;
+}
+
+.shape-style-toolbar__label {
+  color: #4b5b68;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shape-style-toolbar__select,
+.shape-style-toolbar__small-select {
+  border: 1px solid #d9e1ea;
+  border-radius: 8px;
+  background: #f8fafb;
+  color: #324250;
+  font-size: 0.78rem;
+  font-weight: 600;
+  height: 30px;
+  padding: 0 8px;
+}
+
+.shape-style-toolbar__small-select {
+  width: 58px;
+}
+
+.shape-style-toolbar__color {
+  width: 32px;
+  height: 30px;
+  border: 1px solid #d9e1ea;
+  border-radius: 8px;
+  padding: 2px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.shape-style-toolbar__range {
+  width: 90px;
+  accent-color: #1a73e8;
+}
+
+.shape-style-toolbar__delete {
+  border: 1px solid #f1b2b2;
+  border-radius: 8px;
+  background: #fff2f2;
+  color: #a43131;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 30px;
+  min-width: 62px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.shape-style-toolbar__connect {
+  border: 1px solid #b8d2eb;
+  border-radius: 8px;
+  background: #ecf4fc;
+  color: #23527e;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 30px;
+  min-width: 62px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.shape-style-toolbar__edit {
+  border: 1px solid #b9d4bf;
+  border-radius: 8px;
+  background: #eefaf1;
+  color: #1f5b3d;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 30px;
+  min-width: 62px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.shape-style-toolbar__connect.is-active {
+  border-color: #b9c1c8;
+  background: #e5e8eb;
+  color: #5f6770;
+}
+
+.shape-style-toolbar__edit:disabled,
+.shape-style-toolbar__connect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.shape-style-toolbar__delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

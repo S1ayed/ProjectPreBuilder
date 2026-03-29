@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --workspace-bg: #eef1ee;
+  --workspace-bg-deep: #dde4df;
+  --sidebar-bg: #f9faf8;
+  --sidebar-border: #cfd7d1;
+  --panel-bg: #ffffff;
+  --panel-border: #d2dad3;
+  --text-main: #1f2d22;
+  --text-subtle: #5e6f61;
+  --accent: #2f8f5f;
+  --accent-soft: #ddf0e4;
+  --grid-fine: rgba(45, 78, 60, 0.12);
+  --grid-strong: rgba(29, 50, 39, 0.2);
+}
