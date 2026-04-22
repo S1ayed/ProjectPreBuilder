@@ -2,6 +2,7 @@ import { getShapeDefaultSize, getShapeDefaultStyle } from '../../constants/shape
 import { getKindByShapeType, getShapeTypeByKind } from '../mappers/kindShapeMapper'
 import { normalizeNodePayload } from '../normalizers/nodePayloadNormalizer'
 import { normalizeConnections } from '../normalizers/connectionNormalizer'
+import { assertModelShape } from '../validators/modelValidator'
 
 const toRelationSource = (parsed) => {
   if (Array.isArray(parsed?.relations)) {
@@ -21,6 +22,8 @@ const toRelationSource = (parsed) => {
 }
 
 export const convertModelToCanvas = (parsed) => {
+  assertModelShape(parsed)
+
   const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : []
   const relationsSource = toRelationSource(parsed)
 

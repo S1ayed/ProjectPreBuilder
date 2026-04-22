@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { convertModelToCanvas } from '../interpreter/converters/modelToCanvas'
+import { ModelValidationError } from '../interpreter/validators/modelValidator'
 
 export function useImportModel({ onImported }) {
   return useCallback(() => {
@@ -32,7 +33,14 @@ export function useImportModel({ onImported }) {
         })
 
         alert(`导入成功：${importedShapes.length} 个节点，${importedConnections.length} 条连线`)
-      } catch {
+      } catch (error) {
+        if (error instanceof ModelValidationError) {
+          const details = Array.isArray(error.details) ? error.details.slice(0, 4) : []
+          const detailText = details.length > 0 ? `\n- ${details.join('\n- ')}` : ''
+          alert(`导入失败：模型校验不通过${detailText}`)
+          return
+        }
+
         alert('导入失败：JSON 格式无效或数据不兼容')
       }
     }
