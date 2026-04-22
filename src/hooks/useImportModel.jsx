@@ -36,7 +36,16 @@ export function useImportModel({ onImported }) {
       } catch (error) {
         if (error instanceof ModelValidationError) {
           const details = Array.isArray(error.details) ? error.details.slice(0, 4) : []
-          const detailText = details.length > 0 ? `\n- ${details.join('\n- ')}` : ''
+          const detailText = details.length > 0
+            ? `\n- ${details.map((item) => {
+              if (typeof item === 'string') {
+                return item
+              }
+
+              const ruleId = typeof item?.ruleId === 'string' ? `[${item.ruleId}] ` : ''
+              return `${ruleId}${item?.message || '校验失败'}`
+            }).join('\n- ')}`
+            : ''
           alert(`导入失败：模型校验不通过${detailText}`)
           return
         }
