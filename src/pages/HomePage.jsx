@@ -27,6 +27,7 @@ import './HomePage.css'
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 const RESIZE_BREAKPOINT = 980
 const DEFAULT_SIDEBAR_WIDTH = 430
+const HISTORY_LIMIT = 15
 
 const getSidebarBounds = (viewportWidth) => {
   const min = viewportWidth > 1200 ? 360 : 300
@@ -87,6 +88,9 @@ function HomePage() {
   const resizeAnimationFrameRef = useRef(0)
   const pendingSidebarWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH)
   const shapeIdRef = useRef(0)
+  const historyRef = useRef([])
+  const historySnapshotRef = useRef('')
+  const isRestoringHistoryRef = useRef(false)
   const handleSaveWorkspaceSnapshot = useSaveWorkspaceSnapshot({
     viewport,
     assist: workspaceAssist,
@@ -100,12 +104,13 @@ function HomePage() {
   })
   const handleImportModel = useImportModel({
     onImported: ({ shapes, connections }) => {
-      setCanvasShapes(shapes)
-      setCanvasConnections(connections)
-      setEditingNodeId(null)
-      setConnectionToolMode(null)
-      setActiveTool('select')
-      shapeIdRef.current = getNextShapeIdCounter(shapes)
+      const snapshot = {
+        viewport,
+        shapes,
+        connections,
+      }
+      resetHistoryWithSnapshot(snapshot)
+      restoreCanvasSnapshot(snapshot)
     },
   })
 
@@ -114,6 +119,50 @@ function HomePage() {
       cancelAnimationFrame(resizeAnimationFrameRef.current)
     }
   }, [])
+
+  const restoreCanvasSnapshot = (snapshot) => {
+    if (!snapshot) {
+      return
+    }
+
+    isRestoringHistoryRef.current = true
+    setViewport(snapshot.viewport)
+    setCanvasShapes(snapshot.shapes)
+    setCanvasConnections(snapshot.connections)
+    setEditingNodeId(null)
+    setConnectionToolMode(null)
+    setActiveTool('select')
+    shapeIdRef.current = getNextShapeIdCounter(snapshot.shapes)
+  }
+
+  const resetHistoryWithSnapshot = (snapshot) => {
+    const signature = JSON.stringify(snapshot)
+    historyRef.current = [snapshot]
+    historySnapshotRef.current = signature
+  }
+
+  const pushHistorySnapshot = (snapshot) => {
+    const signature = JSON.stringify(snapshot)
+    if (signature === historySnapshotRef.current) {
+      return
+    }
+
+    historySnapshotRef.current = signature
+    const nextHistory = [...historyRef.current, snapshot]
+    historyRef.current = nextHistory.slice(-HISTORY_LIMIT)
+  }
+
+  const handleUndo = () => {
+    if (historyRef.current.length < 2) {
+      return
+    }
+
+    const nextHistory = historyRef.current.slice(0, -1)
+    const previousSnapshot = nextHistory[nextHistory.length - 1]
+    historyRef.current = nextHistory
+    historySnapshotRef.current = JSON.stringify(previousSnapshot)
+    restoreCanvasSnapshot(previousSnapshot)
+  }
 
   useEffect(() => {
     const syncLayout = () => {
@@ -131,6 +180,49 @@ function HomePage() {
 
     return () => {
       window.removeEventListener('resize', syncLayout)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isRestoringHistoryRef.current) {
+      isRestoringHistoryRef.current = false
+      return
+    }
+
+    pushHistorySnapshot({
+      viewport,
+      shapes: canvasShapes,
+      connections: canvasConnections,
+    })
+  }, [viewport, canvasShapes, canvasConnections])
+
+  useEffect(() => {
+    const handleUndoKey = (event) => {
+      const isUndoKey = event.key === 'z' || event.key === 'Z'
+      if (!isUndoKey || !event.ctrlKey || event.shiftKey) {
+        return
+      }
+
+      const activeElement = document.activeElement
+      const tagName = activeElement?.tagName
+      const isInputContext = activeElement && (
+        activeElement.isContentEditable
+        || tagName === 'INPUT'
+        || tagName === 'TEXTAREA'
+        || tagName === 'SELECT'
+      )
+
+      if (isInputContext) {
+        return
+      }
+
+      event.preventDefault()
+      handleUndo()
+    }
+
+    window.addEventListener('keydown', handleUndoKey)
+    return () => {
+      window.removeEventListener('keydown', handleUndoKey)
     }
   }, [])
 
@@ -346,14 +438,14 @@ function HomePage() {
     const nextShapes = snapshot.canvas.shapes
     const nextConnections = snapshot.canvas.connections
 
-    setViewport(nextViewport)
     setWorkspaceAssist(nextAssist)
-    setCanvasShapes(nextShapes)
-    setCanvasConnections(nextConnections)
-    setEditingNodeId(null)
-    setConnectionToolMode(null)
-    setActiveTool('select')
-    shapeIdRef.current = getNextShapeIdCounter(nextShapes)
+    const nextSnapshot = {
+      viewport: nextViewport,
+      shapes: nextShapes,
+      connections: nextConnections,
+    }
+    resetHistoryWithSnapshot(nextSnapshot)
+    restoreCanvasSnapshot(nextSnapshot)
 
     const savedAtText = typeof snapshot.savedAt === 'string' ? `（保存时间：${snapshot.savedAt}）` : ''
     alert(`本地暂存读取成功${savedAtText}`)
