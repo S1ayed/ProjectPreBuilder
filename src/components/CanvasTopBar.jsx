@@ -1,3 +1,7 @@
+import { useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AuthContext } from '../context/AuthContext'
+
 function CanvasTopBar({
   zoom,
   onZoomIn,
@@ -9,6 +13,8 @@ function CanvasTopBar({
   onExportJson,
   onImportJson,
 }) {
+  const { logout } = useContext(AuthContext)
+  const navigate = useNavigate()
   const handleMenuItemClick = (handler) => (event) => {
     handler?.()
     const menu = event.currentTarget.closest('details')
@@ -80,6 +86,20 @@ function CanvasTopBar({
 
       <div className="canvas-topbar__right">
         <button type="button" className="canvas-topbar__btn canvas-topbar__btn--accent" onClick={onExport}>导出</button>
+        <button
+          type="button"
+          className="canvas-topbar__btn"
+          onClick={async () => {
+            try {
+              await logout()
+            } catch (e) {
+              // ignore
+            }
+            navigate('/login')
+          }}
+        >
+          登出
+        </button>
       </div>
     </header>
   )
