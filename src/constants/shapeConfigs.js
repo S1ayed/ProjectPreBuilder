@@ -57,8 +57,15 @@ const SHAPE_CONFIGS = {
 }
 
 const FALLBACK_SHAPE_TYPE = 'rect'
+const customShapeRegistry = new Map()
 
-const getRawShapeConfig = (shapeType) => SHAPE_CONFIGS[shapeType] || SHAPE_CONFIGS[FALLBACK_SHAPE_TYPE]
+const normalizeShapeTypeId = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, '-')
+  .replace(/[^a-z0-9-]/g, '')
+
+const getRawShapeConfig = (shapeType) => customShapeRegistry.get(shapeType) || SHAPE_CONFIGS[shapeType] || SHAPE_CONFIGS[FALLBACK_SHAPE_TYPE]
 
 export const getShapeConfig = (shapeType) => {
   const config = getRawShapeConfig(shapeType)
@@ -69,6 +76,36 @@ export const getShapeConfig = (shapeType) => {
     defaultStyle: { ...config.defaultStyle },
   }
 }
+
+export const registerCustomShapeType = (label, options = {}) => {
+  const normalizedId = normalizeShapeTypeId(label)
+  if (!normalizedId || customShapeRegistry.has(normalizedId) || Object.prototype.hasOwnProperty.call(SHAPE_CONFIGS, normalizedId)) {
+    return null
+  }
+
+  const baseConfig = getShapeConfig(options.baseShapeType || FALLBACK_SHAPE_TYPE)
+  const nextConfig = {
+    nodeKind: options.nodeKind || baseConfig.nodeKind || 'file',
+    resizable: typeof options.resizable === 'boolean' ? options.resizable : baseConfig.resizable,
+    defaultSize: {
+      ...baseConfig.defaultSize,
+      ...(options.defaultSize || {}),
+    },
+    defaultStyle: {
+      ...baseConfig.defaultStyle,
+      ...(options.defaultStyle || {}),
+    },
+    label: String(label || '').trim(),
+  }
+
+  customShapeRegistry.set(normalizedId, nextConfig)
+  return normalizedId
+}
+
+export const getRegisteredShapeTypes = () => new Set([
+  ...Object.keys(SHAPE_CONFIGS),
+  ...customShapeRegistry.keys(),
+])
 
 export const getShapeDefaultSize = (shapeType) => getShapeConfig(shapeType).defaultSize
 

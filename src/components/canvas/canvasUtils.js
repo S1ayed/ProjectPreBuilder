@@ -1,6 +1,8 @@
+import { getRegisteredShapeTypes, getShapeDefaultSize } from '../../constants/shapeConfigs'
+
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-export const supportedShapeTypes = new Set(['rect', 'oval', 'diamond', 'parallelogram', 'text'])
+export const supportedShapeTypes = getRegisteredShapeTypes()
 export const PEN_STROKE_COLOR = '#1a73e8'
 export const PEN_STROKE_WIDTH = 2.6
 export const PEN_MOVE_THRESHOLD_PX = 2
@@ -31,9 +33,12 @@ export const hasShapePayload = (dataTransfer) => {
   )
 }
 
+const getSupportedShapeTypes = () => getRegisteredShapeTypes()
+
 export const extractShapeType = (dataTransfer) => {
+  const supportedTypeSet = getSupportedShapeTypes()
   const directType = dataTransfer.getData('application/x-workbench-shape')
-  if (supportedShapeTypes.has(directType)) {
+  if (supportedTypeSet.has(directType)) {
     return directType
   }
 
@@ -41,7 +46,7 @@ export const extractShapeType = (dataTransfer) => {
   if (jsonPayload) {
     try {
       const parsed = JSON.parse(jsonPayload)
-      if (supportedShapeTypes.has(parsed.shapeType)) {
+      if (supportedTypeSet.has(parsed.shapeType)) {
         return parsed.shapeType
       }
     } catch {
@@ -50,7 +55,7 @@ export const extractShapeType = (dataTransfer) => {
   }
 
   const plainText = dataTransfer.getData('text/plain')
-  if (supportedShapeTypes.has(plainText)) {
+  if (supportedTypeSet.has(plainText)) {
     return plainText
   }
 
@@ -78,7 +83,12 @@ export const getShapeSize = (shape) => {
     return { width: shape.width, height: shape.height }
   }
 
-  return defaultShapeSizes[shape.type] || defaultShapeSizes.rect
+  const defaultSize = getShapeDefaultSize(shape?.type)
+  if (defaultSize && typeof defaultSize.width === 'number' && typeof defaultSize.height === 'number') {
+    return { width: defaultSize.width, height: defaultSize.height }
+  }
+
+  return defaultShapeSizes[shape?.type] || defaultShapeSizes.rect
 }
 
 export const getShapeBoundsWorld = (shape) => {

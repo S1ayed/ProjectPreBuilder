@@ -3,8 +3,8 @@ import {
   extractShapeType,
   getWorldPoint,
   hasShapePayload,
-  supportedShapeTypes,
 } from '../components/canvas/canvasUtils'
+import { getRegisteredShapeTypes } from '../constants/shapeConfigs'
 
 export function useCanvasDropTarget({ viewport, onAddShape }) {
   const [isDropTarget, setIsDropTarget] = useState(false)
@@ -26,7 +26,7 @@ export function useCanvasDropTarget({ viewport, onAddShape }) {
   const handleDrop = (event) => {
     const shapeType = extractShapeType(event.dataTransfer)
 
-    if (!supportedShapeTypes.has(shapeType)) {
+    if (!getRegisteredShapeTypes().has(shapeType)) {
       setIsDropTarget(false)
       return
     }

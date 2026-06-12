@@ -292,6 +292,58 @@
   transform: skewX(-20deg);
 }
 
+.shape-preview--custom {
+  width: 42px;
+  height: 24px;
+  border-radius: 10px;
+  border-color: var(--custom-stroke-color, #1f2937);
+  background: var(--custom-fill-color, #8b5cf6);
+}
+
+.workbench-sidebar__custom-node-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.workbench-sidebar__custom-node-input {
+  width: 100%;
+  border: 1px solid #d0d8e2;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.workbench-sidebar__custom-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workbench-sidebar__custom-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--custom-color);
+  cursor: pointer;
+}
+
+.workbench-sidebar__custom-color-swatch.is-active {
+  border-color: #17325e;
+  box-shadow: 0 0 0 2px rgba(23, 50, 94, 0.18);
+}
+
+.workbench-sidebar__custom-node-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .shape-preview--arrow-line {
   width: 40px;
   height: 10px;
