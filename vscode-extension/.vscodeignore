@@ -1,0 +1,6 @@
+.vscode/**
+src/**
+.gitignore
+**/tsconfig.json
+**/*.ts
+node_modules/.cache

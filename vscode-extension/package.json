@@ -1,0 +1,71 @@
+{
+  "name": "projectprebuilder-vscode",
+  "displayName": "ProjectPreBuilder",
+  "description": "Visual modelling canvas for AI-driven project scaffolding. Draw nodes, wire dependencies, and export structured JSON that LLMs can use to generate projects.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/S1ayed/ProjectPreBuilder.git",
+    "directory": "vscode-extension"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "project-generator",
+    "prebuilder",
+    "ai-scaffolding",
+    "visual-modelling"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "activationEvents": [
+    "onCommand:projectprebuilder.open",
+    "onWebviewPanel:projectprebuilderEditor"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "projectprebuilder.open",
+        "title": "Open ProjectPreBuilder"
+      }
+    ],
+    "configuration": {
+      "title": "ProjectPreBuilder",
+      "properties": {
+        "projectprebuilder.autoSaveInterval": {
+          "type": "number",
+          "default": 30,
+          "description": "Interval in seconds between automatic workspace snapshot saves. Set to 0 to disable."
+        },
+        "projectprebuilder.defaultExportFileName": {
+          "type": "string",
+          "default": "prebuilder-model.json",
+          "description": "Default file name when exporting the model JSON to the workspace root."
+        },
+        "projectprebuilder.confirmBeforeOverwrite": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a confirmation dialog before overwriting an existing file during export."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "lint": "eslint src",
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.6.2",
+    "typescript": "^5.6.3"
+  }
+}
